@@ -9,3 +9,9 @@ __pycache__/
 
 # Saved invoices, PDFs and exports (company data, back these up separately)
 data/
+
+# BIR EIS keys and certificates
+keys/
+*.pem
+*.key
+*.p12

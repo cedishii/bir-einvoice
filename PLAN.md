@@ -1,6 +1,6 @@
 # PLAN — BIR e-Invoice prototype (Micronet Software Manila, Inc.)
 
-Status: **approved 2026-10-14.** Phases 1 and 2 built; phase 3 documented only. Answers to the
+Status: **approved 2026-10-14.** Phases 1, 2 and 3 built (phase 3 requested by the user after phase 2; untested against the real sandbox until enrollment). Answers to the
 open questions are in section 6.
 
 Main reference: `docs/EIS_SPEC_NOTES.md`. Its "Decisions" section is final.

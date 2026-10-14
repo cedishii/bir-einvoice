@@ -13,7 +13,7 @@ issues the EIS Certification ID and PTU number, printed invoices carry a
 |---|---|---|
 | 1 | Invoice entry, saved invoices, printable PDF | done |
 | 2 | EIS JSON export + validator | done |
-| 3 | Sign / encrypt / send to BIR | not built (only needed after enrollment) |
+| 3 | Sign / encrypt / send to BIR, fetch results | built; needs EIS enrollment to use |
 
 ## Run it (Windows)
 
@@ -52,6 +52,26 @@ to stop it.
   `LOCAL-CONFIG` (BIR values still placeholders).
 - Check any JSON file: `.venv\Scripts\python tools\validate_json.py FILE.json [--test]`
 
+### Sending to BIR
+
+This needs the company's EIS enrollment. From BIR's certification portal you
+get the EIS Cert Number, PTU, application ID and secret, a user ID and
+password, the EIS public key, and your EIS key ID. You also need your
+company's private key; if the portal asks you to upload a public key, create a
+pair with `tools\generate_eis_keypair.py`.
+
+1. Put these values in `.env` (see `.env.example`) and the key files in
+   `keys\`, which is never committed.
+2. The **BIR** page in the app shows what's missing. **Test login** checks the
+   connection. The server is BIR's sandbox until `EIS_BASE_URL` is changed.
+3. On an exported invoice, **Send to BIR**, then **Check result**. Or use the
+   BIR page: **Send all** and **Check results**.
+4. `SUC001` means BIR accepted the invoice. Any other code shows BIR's reason,
+   and the invoice can be sent again once the problem is fixed.
+
+Some protocol details are marked *unconfirmed* on the BIR page. See
+`einvoice/eis/transport/README.md`.
+
 ### How amounts are calculated
 
 - PHP unit price = JPY unit price × rate, rounded half up to centavos.
@@ -83,5 +103,6 @@ Everything is in `data\einvoice.db`. Copy that file while the app is closed.
 - `docs/EIS_SPEC_NOTES.md`: the spec notes this follows
 - `PLAN.md`: design and decisions
 - `docs/sample-output/`: example PDFs and a TEST e-invoice JSON
-- `einvoice/eis/transport/README.md`: how phase 3 (sending to BIR) would plug in
+- `einvoice/eis/transport/README.md`: how sending to BIR works, and what's unconfirmed
+- `tests/fake_bir.py`: stand-in BIR server used by the tests
 - `tools/prepare_logo.py`: renders `assets/logo.png` from the company's logo PDF
