@@ -6,6 +6,7 @@
     <dt>TIN</dt><dd>{{ inv.buyer_tin_display }}</dd>
     <dt>Address</dt><dd>{{ inv.buyer_address }}</dd>
     <dt>Business style</dt><dd>{{ inv.business_style or "-" }}</dd>
+    <dt>E-mail</dt><dd>{{ inv.buyer_email or "-" }}</dd>
   </dl>
   <dl>
     <dt>Exchange rate</dt><dd>PHP {{ fmt_rate(inv.rate) }} per JPY 1</dd>

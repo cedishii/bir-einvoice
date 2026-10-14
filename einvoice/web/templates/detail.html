@@ -21,6 +21,37 @@
 
 {% if inv.status == "issued" %}
 <section class="card">
+  <h2>E-mail to client</h2>
+  {% if emails %}
+  <table class="grid">
+    <thead><tr><th>When</th><th>To</th><th>Result</th></tr></thead>
+    <tbody>
+    {% for e in emails %}
+      <tr>
+        <td>{{ e["sent_at"].replace("T", " ")[:16] }}{% if e["automatic"] %} <span class="muted">(auto)</span>{% endif %}</td>
+        <td>{{ e["to_addr"] }}{% if e["cc"] %} <span class="muted">cc {{ e["cc"] }}</span>{% endif %}{% if e["test"] %} <span class="badge unconfirmed">test</span>{% endif %}</td>
+        <td>{% if e["status"] == "sent" %}<span class="badge">sent</span>{% else %}<span class="badge void">failed</span> {{ e["error"] }}{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">Not e-mailed yet.</p>
+  {% endif %}
+  {% if not email.is_configured %}
+  <p class="muted">E-mail is not set up yet (SMTP settings in <code>.env</code>, see README "E-mail").</p>
+  {% elif cfg.is_prototype %}
+  <p class="muted">Prototype mode: e-mails go only to the test address {{ email.test_to or "(EMAIL_TEST_TO not set)" }}, never to the client.</p>
+  {% endif %}
+  <form method="post" action="{{ url_for('email_invoice_route', control_no=inv.control_no) }}"
+        onsubmit="this.querySelector('button').disabled = true">
+    <button type="submit" class="button secondary"
+      {% if not email.is_configured or (not cfg.is_prototype and not inv.buyer_email) %}disabled{% endif %}>
+      {{ "Send again" if emails else "E-mail to client" }}{% if cfg.is_prototype %} (test){% endif %}</button>
+  </form>
+</section>
+
+<section class="card">
   <h2>BIR e-invoice (EIS JSON v2.1)</h2>
   {% if issues %}
   <div class="flash error">

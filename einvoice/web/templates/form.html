@@ -47,6 +47,11 @@
       {{ field("business_style", "Business style", required=False,
                hint="Printed on the invoice only. The BIR JSON has no field for it.") }}
     </div>
+    <div class="row">
+      {{ field("buyer_email", "Client e-mail", "email", required=False,
+               hint=("The invoice PDF is e-mailed here automatically when issued." if email.auto_send
+                     else "The invoice PDF can be e-mailed here from the invoice page.")) }}
+    </div>
   </fieldset>
 
   <fieldset>

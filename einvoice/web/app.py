@@ -7,7 +7,7 @@ from datetime import date
 from flask import (Flask, Response, abort, flash, g, redirect, render_template,
                    request, send_file, url_for)
 
-from .. import money
+from .. import emailer, money
 from ..config import LOGO_PATH, Config, load_config
 from ..models import (DEFAULT_ITEM_NAME, DEFAULT_UNIT, MAX_LEN, FormErrors,
                       invoice_from_form, today_ph)
@@ -24,16 +24,19 @@ from ..storage.repository import Repository
 
 LINE_FIELDS = ["item_name", "description", "qty", "unit", "unit_cost_jpy"]
 FORM_FIELDS = ["issue_date", "buyer_name", "buyer_tin", "buyer_address",
-               "business_style", "rate", "rate_date", "rate_source"]
+               "business_style", "buyer_email", "rate", "rate_date", "rate_source"]
 DEFAULT_LINES = 2
 
 
 def create_app(config: Config | None = None, transport: TransportSettings | None = None,
-               http=None) -> Flask:
-    """`transport` / `http` let tests use a fake BIR server."""
+               http=None, email: emailer.EmailSettings | None = None,
+               email_sender: emailer.Sender | None = None) -> Flask:
+    """`transport`/`http` and `email`/`email_sender` let tests use fakes."""
     app = Flask(__name__)
     app.config["EINVOICE"] = config or load_config()
     app.config["EIS_TRANSPORT"] = transport or load_transport_settings()
+    app.config["EMAIL"] = email or emailer.load_email_settings()
+    send_mail = email_sender if email_sender is not None else emailer.smtp_send
     eis_clients: list[EisClient] = []  # one client, so the login session is reused
     app.secret_key = secrets.token_hex(16)
     # Review-page tokens already used to issue an invoice -> control number,
@@ -63,12 +66,24 @@ def create_app(config: Config | None = None, transport: TransportSettings | None
             eis_clients.append(EisClient(cfg(), transport(), http=http))
         return eis_clients[0]
 
+    def email_settings() -> emailer.EmailSettings:
+        return app.config["EMAIL"]
+
+    def email_invoice(inv, automatic=False):
+        try:
+            result = emailer.send_invoice(repo().conn, inv, cfg(), email_settings(),
+                                          automatic=automatic, sender=send_mail)
+            flash(result.message)
+        except emailer.EmailError as e:
+            flash(("Automatic e-mail not sent: " if automatic else "") + str(e), "error")
+
     def can_send() -> bool:
         return not cfg().is_prototype and transport().is_configured
 
     @app.context_processor
     def globals_():
         return {"cfg": cfg(), "transport": transport(), "can_send": can_send(),
+                "email": email_settings(),
                 "fmt": money.fmt, "fmt_rate": money.fmt_rate,
                 "fmt_qty": money.fmt_qty,
                 "max_len": MAX_LEN}
@@ -106,6 +121,7 @@ def create_app(config: Config | None = None, transport: TransportSettings | None
                 "buyer_tin": "" if not src.has_tin else src.buyer_tin + src.buyer_branch,
                 "buyer_address": src.buyer_address,
                 "business_style": src.business_style,
+                "buyer_email": src.buyer_email,
                 "rate_source": src.rate_source,  # the source, never the rate itself
             }
         blank = [DEFAULT_ITEM_NAME, "", "1", DEFAULT_UNIT, ""]
@@ -148,6 +164,8 @@ def create_app(config: Config | None = None, transport: TransportSettings | None
         inv = repo().issue(inv)
         issued_tokens[token] = inv.control_no
         flash(f"Service Invoice No. {inv.control_no} issued.")
+        if email_settings().auto_send:
+            email_invoice(inv, automatic=True)
         return redirect(url_for("show_invoice", control_no=inv.control_no))
 
     def get_or_404(control_no: str):
@@ -160,6 +178,7 @@ def create_app(config: Config | None = None, transport: TransportSettings | None
         exported = eis_export.existing_export(repo().conn, cfg(), inv)
         bir = eis_service.status_of(repo().conn, exported.eis_unique_id) if exported else None
         return render_template("detail.html", inv=inv, exported=exported, bir=bir,
+                               emails=emailer.history(repo().conn, inv),
                                issues=issues or [], eis_id=_eis_id(inv)), status
 
     def _eis_id(inv):
@@ -224,6 +243,11 @@ def create_app(config: Config | None = None, transport: TransportSettings | None
             flash(f"Invoice {control_no} voided. Its number will not be used again.")
         except ValueError as e:
             flash(str(e), "error")
+        return redirect(url_for("show_invoice", control_no=control_no))
+
+    @app.post("/invoices/<control_no>/email")
+    def email_invoice_route(control_no):
+        email_invoice(get_or_404(control_no))
         return redirect(url_for("show_invoice", control_no=control_no))
 
     # --- Phase 3: sending to BIR -------------------------------------------

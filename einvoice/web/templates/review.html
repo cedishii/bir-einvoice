@@ -15,6 +15,9 @@
 <div class="flash">&check; Passes the BIR e-invoice (EIS v2.1) checks.</div>
 {% endif %}
 
+{% if email.auto_send and inv.buyer_email %}
+<p class="muted">After issuing, the PDF is e-mailed {% if cfg.is_prototype %}as a TEST to {{ email.test_to or "(EMAIL_TEST_TO not set)" }}{% else %}to <strong>{{ inv.buyer_email }}</strong>{% endif %}.</p>
+{% endif %}
 <div class="card">
   {% include "_summary.html" %}
 </div>
