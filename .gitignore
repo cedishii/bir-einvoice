@@ -1,0 +1,11 @@
+# Real BIR credentials and local settings
+.env
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Saved invoices, PDFs and exports (company data, back these up separately)
+data/

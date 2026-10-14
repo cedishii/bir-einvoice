@@ -1,0 +1,134 @@
+{
+  "CompInvoiceId": "0000000205",
+  "IssueDtm": "20260730",
+  "EisUniqueId": "2026073020146IT400000205",
+  "DocType": "01",
+  "TransClass": "04",
+  "CorrYN": "N",
+  "CorrectionCd": "",
+  "PrevUniqueId": "",
+  "Rmk1": "test e-invoice : 2026073020146IT400000205",
+  "SellerInfo": {
+    "Tin": "999999999",
+    "BranchCd": "00000",
+    "Type": "2",
+    "RegNm": " Registered Name ",
+    "BusinessNm": "",
+    "Email": " taxpayerEmail@testCompany.com",
+    "RegAddr": "BIR National Office Building, Santiago Avenue, Diliman, Quezon City, Philippines"
+  },
+  "BuyerInfo": {
+    "Tin": "225125979",
+    "BranchCd": "00000",
+    "RegNm": " Test -Buyer Company",
+    "BusinessNm": "",
+    "Email": "donga_admin@donga.com",
+    "RegAddr": "UNIT 2803 ATLANTA CENTRE ILOILO 1500 PHILIPPINES",
+    "DevAddr": "UNIT 2803 ATLANTA CENTRE ILOILO 1500 PHILIPPINES",
+    "AirNum": "",
+    "AirNumDt": "",
+    "LadNum": "",
+    "LadNumDt": ""
+  },
+  "ItemList": [
+    {
+      "Nm": "Line Item1",
+      "Desc": "Item1",
+      "Qty": 2,
+      "Unit": "EA",
+      "UnitCost": 44130,
+      "SalesAmt": 88260,
+      "RegDscntAmt": 440,
+      "SpeDscntAmt": 40,
+      "NetSales": 87780
+    },
+    {
+      "Nm": "Line Item2",
+      "Desc": " Item2",
+      "Qty": 9,
+      "Unit": "EA",
+      "UnitCost": 77840,
+      "SalesAmt": 700560,
+      "RegDscntAmt": 550,
+      "SpeDscntAmt": 650,
+      "NetSales": 699360
+    },
+    {
+      "Nm": "Line Item3",
+      "Desc": " Item3",
+      "Qty": 9,
+      "Unit": "EA",
+      "UnitCost": 56070,
+      "SalesAmt": 504630,
+      "RegDscntAmt": 80,
+      "SpeDscntAmt": 390,
+      "NetSales": 504160
+    },
+    {
+      "Nm": "Line Item4",
+      "Desc": "Item4",
+      "Qty": 4,
+      "Unit": "EA",
+      "UnitCost": 54810,
+      "SalesAmt": 219240,
+      "RegDscntAmt": 840,
+      "SpeDscntAmt": 660,
+      "NetSales": 217740
+    },
+    {
+      "Nm": "Line Item5",
+      "Desc": "Item5",
+      "Qty": 4,
+      "Unit": "EA",
+      "UnitCost": 88700,
+      "SalesAmt": 354800,
+      "RegDscntAmt": 240,
+      "SpeDscntAmt": 580,
+      "NetSales": 353980
+    },
+    {
+      "Nm": "Line Item6",
+      "Desc": "Item6",
+      "Qty": 5,
+      "Unit": "EA",
+      "UnitCost": 97670,
+      "SalesAmt": 488350,
+      "RegDscntAmt": 200,
+      "SpeDscntAmt": 340,
+      "NetSales": 487810
+    },
+    {
+      "Nm": "Line Item7",
+      "Desc": "Item7",
+      "Qty": 2,
+      "Unit": "EA",
+      "UnitCost": 81020,
+      "SalesAmt": 162040,
+      "RegDscntAmt": 430,
+      "SpeDscntAmt": 790,
+      "NetSales": 160820
+    }
+  ],
+  "TotNetItemSales": 2511650,
+  "Discount": {
+    "ScAmt": 360,
+    "PwdAmt": 230,
+    "RegAmt": 740,
+    "SpeAmt": 550,
+    "Rmk2": ""
+  },
+  "OtherTaxRev": 530,
+  "TotNetSalesAftDisct": 2510300,
+  "VATAmt": 301398.0,
+  "WithholdIncome": 420,
+  "WithholdBusVAT": 990,
+  "WithholdBusPT": 93,
+  "OtherNonTaxCharge": 97,
+  "NetAmtPay": 2810385.0,
+  "ForCur": {
+    "Currency": "USD",
+    "ForexAmt": 380,
+    "ConvRate": 60
+  },
+  "PtuNum": "20146IT4-4"
+}
