@@ -15,17 +15,28 @@ issues the EIS Certification ID and PTU number, printed invoices carry a
 | 2 | EIS JSON export + validator | done |
 | 3 | Sign / encrypt / send to BIR, fetch results | built; needs EIS enrollment to use |
 
-## Run it (Windows)
+## Open it (Windows)
 
 Requires Python 3.12 or newer from [python.org](https://www.python.org/downloads/).
+Nothing goes on the internet: the app runs only on this laptop. There are two
+ways to open it, and both use the same data.
 
-Double-click **`run.bat`**. The first run installs what it needs and creates
-`.env`. The app then opens at <http://127.0.0.1:5000>. Close the black window
-to stop it.
+**As a desktop app (own window).** Run **`Create desktop shortcut.bat`**
+once. It sets everything up and adds a **Micronet e-Invoice** shortcut, with
+the logo, to the desktop and the Start menu. The shortcut opens the app in its
+own window, with no browser tabs and no black console window. Closing the
+window shuts the app down.
+
+**In the browser.** Double-click **`run.bat`**. The app opens in your normal
+browser at <http://127.0.0.1:5000>, next to your other tabs. Keep the black
+window open while you use it; closing it stops the app.
+
+If the app is already open one way, the shortcut opens a window onto the same
+running app.
 
 ## Using it
 
-1. **+ New invoice.** Fill in the date, client, the "payment for" lines in JPY,
+1. **+ New invoice.** Fill in the date, client (with their e-mail), the "payment for" lines in JPY,
    and the exchange rate (PHP per 1 JPY) with its date and source. The client
    details are copied from the last invoice; the rate never is.
 2. **Review invoice.** Check the PHP amounts. Nothing is saved yet.
@@ -35,6 +46,26 @@ to stop it.
    issue a new one. Voided numbers are never reused. Once an invoice has been
    exported to EIS JSON it can't be voided this way (BIR expects a correction
    document, which is not built yet).
+
+### E-mailing invoices
+
+Fill in the SMTP settings in `.env`: server, login and the "From" address.
+Your mail provider gives you these:
+
+| Provider | SMTP_HOST | SMTP_PORT | SMTP_SECURITY | Note |
+|---|---|---|---|---|
+| Microsoft 365 / Outlook | `smtp.office365.com` | 587 | `starttls` | Your IT admin may need to allow "SMTP AUTH" for the mailbox |
+| Gmail / Google Workspace | `smtp.gmail.com` | 587 | `starttls` | Use an App Password, not the normal password |
+
+- With `EMAIL_AUTO_SEND=true`, the PDF goes to the client's e-mail as soon as
+  an invoice is issued. Each invoice page also has **E-mail to client** (or
+  **Send again**). Every e-mail is logged on the invoice.
+- `EMAIL_CC` / `EMAIL_BCC` put copies in other mailboxes, e.g. accounting.
+- If sending fails, the invoice is still issued, the error is shown and
+  logged, and you can press **Send again**.
+- **Prototype mode:** while BIR's numbers are still placeholders, the PDF has
+  the PROTOTYPE watermark, so e-mails never go to clients. They go only to
+  `EMAIL_TEST_TO`, marked [TEST]. With no test address set, nothing is sent.
 
 ### BIR e-invoice JSON
 
@@ -106,3 +137,5 @@ Everything is in `data\einvoice.db`. Copy that file while the app is closed.
 - `einvoice/eis/transport/README.md`: how sending to BIR works, and what's unconfirmed
 - `tests/fake_bir.py`: stand-in BIR server used by the tests
 - `tools/prepare_logo.py`: renders `assets/logo.png` from the company's logo PDF
+- `tools/create_shortcut.py`: desktop / Start menu shortcut (run via `Create desktop shortcut.bat`)
+- `einvoice/desktop.py`: the desktop-window mode
