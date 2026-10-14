@@ -85,7 +85,7 @@
 
   <fieldset>
     <legend>Exchange rate (JPY to PHP)</legend>
-    <p class="muted">BIR requires all amounts in pesos. Enter the rate used for this invoice; it is saved and printed with the invoice.</p>
+    <p class="muted">BIR requires all amounts in pesos. Enter the rate used for this invoice. It is saved and sent to BIR, but not printed on the invoice.</p>
     <div class="row three">
       {{ field("rate", "PHP per 1 JPY", hint="Up to 6 decimals, e.g. 0.3842", attrs='inputmode="decimal" placeholder="0.0000"') }}
       {{ field("rate_date", "Rate date", "date") }}

@@ -7,17 +7,31 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-  <header class="topbar">
+{% set ep = request.endpoint or "" %}
+<div class="layout">
+  <aside class="sidebar">
     <a class="brand" href="{{ url_for('index') }}">
-      <img src="{{ url_for('logo') }}" alt="Micronet Software Manila, Inc." height="40">
-      <span>e-Invoice <small>BIR EIS v2.1 prototype</small></span>
+      <img src="{{ url_for('logo') }}" alt="Micronet Software Manila, Inc.">
+      <span>e-Invoice <small>BIR EIS v2.1</small></span>
     </a>
     <nav>
-      <a href="{{ url_for('index') }}">Invoices</a>
-      <a href="{{ url_for('bir_page') }}">BIR{% if not transport.is_sandbox %} <span class="badge live">LIVE</span>{% endif %}</a>
-      <a class="button" href="{{ url_for('new_invoice') }}">+ New invoice</a>
+      <a href="{{ url_for('index') }}"
+         class="{{ 'active' if ep in ('index', 'show_invoice', 'test_export_invoice') }}">
+        <span class="icon">&#9776;</span> Invoices</a>
+      <a href="{{ url_for('new_invoice') }}"
+         class="{{ 'active' if ep in ('new_invoice', 'review_invoice', 'edit_invoice', 'issue_invoice') }}">
+        <span class="icon">&#43;</span> New invoice</a>
+      <a href="{{ url_for('bir_page') }}" class="{{ 'active' if ep.startswith('bir') }}">
+        <span class="icon">&#8645;</span> BIR
+        {% if not transport.is_sandbox %}<span class="badge live">LIVE</span>{% endif %}</a>
     </nav>
-  </header>
+    <div class="sidebar-foot">
+      {% if cfg.is_prototype %}<span class="badge unconfirmed">prototype</span>{% endif %}
+      <small>{{ cfg.seller.reg_nm }}</small>
+    </div>
+  </aside>
+
+  <div class="content">
   {% if cfg.is_prototype %}
   <div class="notice">
     <strong>Prototype mode.</strong> BIR has not issued
@@ -33,6 +47,14 @@
     {% endwith %}
     {% block content %}{% endblock %}
   </main>
+  </div>
+</div>
+
+{% if ep not in ('new_invoice', 'review_invoice', 'edit_invoice', 'issue_invoice') %}
+<a class="fab" href="{{ url_for('new_invoice') }}" title="New invoice">
+  <span>+</span> New invoice
+</a>
+{% endif %}
   {% if config.DESKTOP %}
   <script>
     // Desktop window: tell the app this window is open, and when it closes,
