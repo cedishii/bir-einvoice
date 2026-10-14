@@ -388,15 +388,17 @@ def _check_math(get: _Getter, issues: list[Issue]) -> None:
         if after != expected:
             bad("TotNetSalesAftDisct", expected, after)
 
-    # NetAmtPay: the notes only confirm the zero-rated case without
-    # withholding or other charges (BIR sample JSON-02): NetAmtPay =
-    # TotNetSalesAftDisct. Other combinations aren't checked rather than guessed.
-    extras = [get.num(k) for k in ("WithholdIncome", "WithholdBusVAT",
-                                   "WithholdBusPT", "OtherNonTaxCharge")]
-    pay, vat = get.num("NetAmtPay"), get.num("VATAmt")
-    if (get.str("TransClass") == "02" and None not in (pay, after, vat, *extras)
-            and vat == 0 and all(x == 0 for x in extras) and pay != after):
-        bad("NetAmtPay", after, pay)
+    # NetAmtPay is the invoice's total payment: what the buyer pays. That is
+    # the sales after discounts plus VAT and other charges, less what the
+    # buyer withholds. For a zero-rated invoice without withholding it equals
+    # TotNetSalesAftDisct (BIR sample JSON-02) and the PDF's TOTAL AMOUNT DUE.
+    vat, other_charge = get.num("VATAmt"), get.num("OtherNonTaxCharge")
+    withheld = [get.num(k) for k in ("WithholdIncome", "WithholdBusVAT", "WithholdBusPT")]
+    pay = get.num("NetAmtPay")
+    if None not in (pay, after, vat, other_charge, *withheld):
+        expected = after + vat + other_charge - sum(withheld)
+        if pay != expected:
+            bad("NetAmtPay", expected, pay)
 
 
 # --- foreign currency (SYN004, LOCAL-FX) ----------------------------------------

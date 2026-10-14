@@ -171,9 +171,9 @@ Added while building phase 2:
 - An invoice that has been exported can't be voided (BIR expects a correction
   document with CorrYN "Y"; not built). The review page runs the EIS check, so
   an invoice that would fail export is never issued.
-- `NetAmtPay` is checked only in the confirmed case (zero-rated, no withholding
-  or other charges: NetAmtPay = TotNetSalesAftDisct). The general formula isn't
-  in the notes, so it isn't guessed.
+- `NetAmtPay` is the invoice's total payment (confirmed by the user): sales
+  after discounts + VAT + other charges - amounts withheld by the buyer. For
+  Micronet's zero-rated invoices it equals the PDF's TOTAL AMOUNT DUE (PHP).
 - Still to confirm against the official downloaded spec: ConvRate with more than
   2 decimals (the validator allows up to 6).
 

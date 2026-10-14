@@ -378,12 +378,14 @@ def test_test_values_only_in_test_mode():
 # --- BIR's own sample ---------------------------------------------------------
 
 def test_bir_sample_is_flagged_as_expected():
-    """docs/sample-einvoice.json: valid structure and line/total maths, but RBE
-    codes (not allowed for Micronet) and dummy ForCur values."""
+    """docs/sample-einvoice.json: valid structure and line totals, but RBE codes
+    (not allowed for Micronet) and dummy NetAmtPay / ForCur values (as noted in
+    docs/EIS_SPEC_NOTES.md)."""
     text = (ROOT / "docs" / "sample-einvoice.json").read_text(encoding="utf-8")
     issues = validate_text(text, Context("20146IT4", today=date(2026, 10, 14), test_mode=True))
     found = {i.code for i in issues}
-    assert found == {"ERR013", "ERR015", "LOCAL-FX"}
+    assert found == {"ERR013", "ERR015", "LOCAL-MATH", "LOCAL-FX"}
+    assert {i.path for i in issues if i.code == "LOCAL-MATH"} == {"NetAmtPay"}
     assert not any(i.code == "SYN004" and "not part of" in i.message for i in issues)
 
 
@@ -400,3 +402,23 @@ def test_serializer_number_forms():
 def test_serializer_rejects_floats():
     with pytest.raises(TypeError):
         dumps({"x": 1.5})
+
+
+def test_net_amount_payable_is_the_total_payment():
+    # Total payment = sales after discounts + VAT + other charges - withheld.
+    doc = base()
+    doc["OtherNonTaxCharge"] = D("500.00")
+    doc["WithholdIncome"] = D("1000.00")
+    assert "NetAmtPay" in paths_of(doc)
+    doc["NetAmtPay"] = D("4559500.00")
+    doc["ForCur"]["ForexAmt"] = D("11998684.21")  # keep ForCur consistent
+    assert "NetAmtPay" not in paths_of(doc)
+
+
+def test_net_amount_payable_includes_vat():
+    doc = base()
+    doc["TransClass"] = "01"
+    doc["VATAmt"] = D("547200.00")
+    assert "NetAmtPay" in paths_of(doc)
+    doc["NetAmtPay"] = D("5107200.00")
+    assert "NetAmtPay" not in paths_of(doc)
