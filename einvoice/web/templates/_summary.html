@@ -1,0 +1,50 @@
+{# Invoice contents, shared by the review and detail pages. Expects `inv`. #}
+<div class="summary-grid">
+  <dl>
+    <dt>Invoice date</dt><dd>{{ inv.issue_date | longdate }}</dd>
+    <dt>Sold to</dt><dd><strong>{{ inv.buyer_name }}</strong></dd>
+    <dt>TIN</dt><dd>{{ inv.buyer_tin_display }}</dd>
+    <dt>Address</dt><dd>{{ inv.buyer_address }}</dd>
+    <dt>Business style</dt><dd>{{ inv.business_style or "-" }}</dd>
+  </dl>
+  <dl>
+    <dt>Exchange rate</dt><dd>PHP {{ fmt_rate(inv.rate) }} per JPY 1</dd>
+    <dt>Rate date</dt><dd>{{ inv.rate_date | longdate }}</dd>
+    <dt>Rate source</dt><dd>{{ inv.rate_source }}</dd>
+    <dt>Sale type</dt><dd><span class="badge zr">Zero-rated sale</span></dd>
+  </dl>
+</div>
+
+<table class="grid">
+  <thead>
+    <tr><th>#</th><th>Particulars</th><th class="num">Qty</th><th>Unit</th>
+        <th class="num">Unit price (JPY)</th><th class="num">Amount (JPY)</th>
+        <th class="num">Unit price (PHP)</th><th class="num">Amount (PHP)</th></tr>
+  </thead>
+  <tbody>
+  {% for line in inv.lines %}
+    <tr>
+      <td>{{ loop.index }}</td>
+      <td><strong>{{ line.item_name }}</strong><br>{{ line.description }}</td>
+      <td class="num">{{ fmt_qty(line.qty) }}</td>
+      <td>{{ line.unit }}</td>
+      <td class="num">{{ fmt(line.unit_cost_jpy) }}</td>
+      <td class="num">{{ fmt(line.amount_jpy) }}</td>
+      <td class="num">{{ fmt(line.unit_cost_php) }}</td>
+      <td class="num">{{ fmt(line.sales_php) }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+  <tfoot>
+    <tr><th colspan="5">Total</th><th class="num">JPY {{ fmt(inv.total_jpy) }}</th>
+        <th></th><th class="num">PHP {{ fmt(inv.total_php) }}</th></tr>
+  </tfoot>
+</table>
+
+<table class="sales-box">
+  <tr><td>VATable Sales</td><td class="num">0.00</td></tr>
+  <tr><td>VAT-Exempt Sales</td><td class="num">0.00</td></tr>
+  <tr class="zr"><td>Zero-Rated Sales</td><td class="num">{{ fmt(inv.total_php) }}</td></tr>
+  <tr><td>VAT Amount</td><td class="num">0.00</td></tr>
+  <tr class="total"><td>Total Amount Due (PHP)</td><td class="num">{{ fmt(inv.total_php) }}</td></tr>
+</table>

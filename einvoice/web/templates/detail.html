@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Invoice {{ inv.control_no }}{% endblock %}
+{% block content %}
+<div class="heading">
+  <h1>Service Invoice No. {{ inv.control_no }} <span class="badge {{ inv.status }}">{{ inv.status }}</span></h1>
+  <p class="muted">Issued {{ inv.created_at.replace("T", " ")[:16] }}</p>
+</div>
+
+{% if inv.status == "void" %}
+<div class="flash error">Voided {{ inv.voided_at.replace("T", " ")[:16] }}: {{ inv.void_reason }}</div>
+{% endif %}
+
+<div class="actions left">
+  <a class="button" href="{{ url_for('invoice_pdf', control_no=inv.control_no) }}" target="_blank">Open / print PDF</a>
+  <a class="button secondary" href="{{ url_for('invoice_pdf', control_no=inv.control_no, download=1) }}">Download PDF</a>
+</div>
+
+<div class="card">
+  {% include "_summary.html" %}
+</div>
+
+{% if inv.status == "issued" %}
+<details class="card danger">
+  <summary>Void this invoice</summary>
+  <p>Use this when the invoice has a mistake. The invoice stays on file marked VOID, its number is never used again, and you issue a new invoice with the correct details.</p>
+  <form method="post" action="{{ url_for('void_invoice', control_no=inv.control_no) }}"
+        onsubmit="return confirm('Void invoice {{ inv.control_no }}? This cannot be undone.')">
+    <label class="field"><span>Reason <em>*</em></span>
+      <input name="reason" required maxlength="200" placeholder="e.g. Wrong client address"></label>
+    <button type="submit" class="button danger">Void invoice</button>
+  </form>
+</details>
+{% endif %}
+{% endblock %}

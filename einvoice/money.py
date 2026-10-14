@@ -134,3 +134,8 @@ def amount_in_words(value: Decimal, currency_word: str) -> str:
     if cents:
         text = f"{int_to_words(whole)} AND {cents:02d}/100 {currency_word}"
     return text + " ONLY"
+
+
+def fmt_qty(qty: Decimal) -> str:
+    """1 -> '1', 1.50 -> '1.5', 1000 -> '1,000'."""
+    return f"{int(qty):,}" if qty == qty.to_integral_value() else f"{qty.normalize():f}"

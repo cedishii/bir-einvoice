@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}New invoice{% endblock %}
+{% block content %}
+<div class="heading">
+  <h1>New Service Invoice</h1>
+  <p class="muted">Will be issued as No. <strong>{{ next_no }}</strong>. The number is only used once you confirm on the next page.</p>
+</div>
+
+{% if errors %}
+<div class="flash error">
+  Please fix the following:
+  <ul>{% for msg in errors.values() %}<li>{{ msg }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+
+{% macro field(name, label, type="text", hint="", required=True, attrs="") %}
+<label class="field {{ 'has-error' if errors.get(name) }}">
+  <span>{{ label }}{% if required %} <em>*</em>{% endif %}</span>
+  <input type="{{ type }}" name="{{ name }}" value="{{ data[name] }}"
+         {% if name in max_len %}maxlength="{{ max_len[name] }}"{% endif %}
+         {% if required %}required{% endif %} {{ attrs | safe }}>
+  {% if hint %}<small>{{ hint }}</small>{% endif %}
+</label>
+{% endmacro %}
+
+<form method="post" action="{{ url_for('review_invoice') }}" class="card" novalidate>
+  <fieldset>
+    <legend>Invoice</legend>
+    <div class="row">
+      {{ field("issue_date", "Invoice date", "date") }}
+      <div class="field static">
+        <span>Sale type</span>
+        <div><span class="badge zr">Zero-rated sale</span> Export of services, VAT 0.00</div>
+      </div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Client (sold to)</legend>
+    <div class="row">
+      {{ field("buyer_name", "Client name") }}
+      {{ field("buyer_tin", "Client TIN", required=False,
+               hint="Philippine TIN only, e.g. 123-456-789-00000. Leave blank for clients in Japan (sent to BIR as 000000000).") }}
+    </div>
+    <div class="row">
+      {{ field("buyer_address", "Client address") }}
+      {{ field("business_style", "Business style", required=False,
+               hint="Printed on the invoice only. The BIR JSON has no field for it.") }}
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Payment for</legend>
+    <table class="lines" id="lines">
+      <thead>
+        <tr>
+          <th>Item name <em>*</em></th><th class="wide">Description <em>*</em></th>
+          <th>Qty</th><th>Unit</th><th>Unit price (JPY) <em>*</em></th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for row in rows %}
+        <tr class="{{ 'has-error' if errors.get('line' ~ loop.index) }}">
+          <td><input name="item_name[]" value="{{ row[0] }}" maxlength="100"></td>
+          <td><input name="description[]" value="{{ row[1] }}" maxlength="100"
+                     placeholder="e.g. IT services rendered for Nov 2024"></td>
+          <td><input name="qty[]" value="{{ row[2] }}" inputmode="decimal" class="short"></td>
+          <td><input name="unit[]" value="{{ row[3] }}" maxlength="50" class="short"></td>
+          <td><input name="unit_cost_jpy[]" value="{{ row[4] }}" inputmode="decimal"
+                     class="num" placeholder="0"></td>
+          <td><button type="button" class="link remove" title="Remove line">&times;</button></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <button type="button" class="link" id="add-line">+ Add line</button>
+    <small class="muted block">Blank lines are ignored.</small>
+  </fieldset>
+
+  <fieldset>
+    <legend>Exchange rate (JPY to PHP)</legend>
+    <p class="muted">BIR requires all amounts in pesos. Enter the rate used for this invoice; it is saved and printed with the invoice.</p>
+    <div class="row three">
+      {{ field("rate", "PHP per 1 JPY", hint="Up to 6 decimals, e.g. 0.3842", attrs='inputmode="decimal" placeholder="0.0000"') }}
+      {{ field("rate_date", "Rate date", "date") }}
+      {{ field("rate_source", "Rate source", hint="e.g. BSP reference rate") }}
+    </div>
+  </fieldset>
+
+  <div class="actions">
+    <a href="{{ url_for('index') }}">Cancel</a>
+    <button type="submit" class="button">Review invoice &rarr;</button>
+  </div>
+</form>
+
+<script>
+  const tbody = document.querySelector("#lines tbody");
+  document.getElementById("add-line").addEventListener("click", () => {
+    const row = tbody.rows[tbody.rows.length - 1].cloneNode(true);
+    row.classList.remove("has-error");
+    row.querySelector('[name="description[]"]').value = "";
+    row.querySelector('[name="unit_cost_jpy[]"]').value = "";
+    row.querySelector('[name="qty[]"]').value = "1";
+    tbody.appendChild(row);
+    row.querySelector('[name="description[]"]').focus();
+  });
+  tbody.addEventListener("click", (e) => {
+    if (!e.target.classList.contains("remove")) return;
+    if (tbody.rows.length > 1) e.target.closest("tr").remove();
+    else e.target.closest("tr").querySelectorAll("input").forEach(i => {
+      if (i.name !== "item_name[]" && i.name !== "unit[]") i.value = i.name === "qty[]" ? "1" : "";
+    });
+  });
+</script>
+{% endblock %}

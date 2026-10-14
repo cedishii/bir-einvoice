@@ -1,0 +1,12 @@
+{# Carries the entered form values from the review page back to edit / issue. #}
+{% for key in ["issue_date", "buyer_name", "buyer_tin", "buyer_address",
+               "business_style", "rate", "rate_date", "rate_source"] %}
+<input type="hidden" name="{{ key }}" value="{{ data[key] }}">
+{% endfor %}
+{% for row in rows %}
+<input type="hidden" name="item_name[]" value="{{ row[0] }}">
+<input type="hidden" name="description[]" value="{{ row[1] }}">
+<input type="hidden" name="qty[]" value="{{ row[2] }}">
+<input type="hidden" name="unit[]" value="{{ row[3] }}">
+<input type="hidden" name="unit_cost_jpy[]" value="{{ row[4] }}">
+{% endfor %}

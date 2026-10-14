@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="heading">
+  <h1>Service Invoices</h1>
+  <p class="muted">Next control number: <strong>{{ next_no }}</strong></p>
+</div>
+{% if invoices %}
+<table class="grid">
+  <thead>
+    <tr>
+      <th>No.</th><th>Date</th><th>Client</th>
+      <th class="num">Amount (JPY)</th><th class="num">Amount (PHP)</th>
+      <th>Status</th><th></th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for inv in invoices %}
+    <tr class="{{ inv.status }}">
+      <td><a href="{{ url_for('show_invoice', control_no=inv.control_no) }}">{{ inv.control_no }}</a></td>
+      <td>{{ inv.issue_date.isoformat() }}</td>
+      <td>{{ inv.buyer_name }}</td>
+      <td class="num">{{ fmt(inv.total_jpy) }}</td>
+      <td class="num">{{ fmt(inv.total_php) }}</td>
+      <td><span class="badge {{ inv.status }}">{{ inv.status }}</span></td>
+      <td><a href="{{ url_for('invoice_pdf', control_no=inv.control_no) }}" target="_blank">PDF</a></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty">No invoices yet. <a href="{{ url_for('new_invoice') }}">Create the first one</a>.</p>
+{% endif %}
+{% endblock %}

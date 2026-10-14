@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Service Invoices{% endblock %} · Micronet e-Invoice</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="{{ url_for('index') }}">
+      <img src="{{ url_for('logo') }}" alt="Micronet Software Manila, Inc." height="40">
+      <span>e-Invoice <small>BIR EIS v2.1 prototype</small></span>
+    </a>
+    <nav>
+      <a href="{{ url_for('index') }}">Invoices</a>
+      <a class="button" href="{{ url_for('new_invoice') }}">+ New invoice</a>
+    </nav>
+  </header>
+  {% if cfg.is_prototype %}
+  <div class="notice">
+    <strong>Prototype mode.</strong> BIR has not issued
+    {{ cfg.placeholders | join(' and ') }} yet (set in <code>.env</code>).
+    Printed invoices carry a "PROTOTYPE" watermark.
+  </div>
+  {% endif %}
+  <main>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="flash {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>
