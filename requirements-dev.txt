@@ -1,0 +1,3 @@
+-r requirements.txt
+# Reads PDF text in tests and renders assets/logo.png (tools/prepare_logo.py)
+pymupdf==1.28.2
