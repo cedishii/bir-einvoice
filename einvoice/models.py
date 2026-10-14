@@ -20,6 +20,7 @@ PH_TZ = timezone(timedelta(hours=8))
 MAX_LEN = {
     "buyer_name": 200,      # BuyerInfo.RegNm
     "buyer_address": 300,   # BuyerInfo.RegAddr
+    "buyer_email": 100,     # BuyerInfo.Email
     "business_style": 200,  # printed only
     "item_name": 100,       # ItemList.Nm
     "description": 100,     # ItemList.Desc
@@ -63,6 +64,7 @@ class Invoice:
     rate_date: date
     rate_source: str
     lines: list[InvoiceLine]
+    buyer_email: str = ""     # where the invoice PDF is e-mailed; BuyerInfo.Email
     control_no: str = ""      # assigned when the invoice is issued
     status: str = "draft"     # draft / issued / void
     eis_key: str = ""         # last 8 chars of the EisUniqueId, fixed at issue
@@ -101,6 +103,13 @@ class FormErrors(Exception):
     def __init__(self, errors: dict[str, str]):
         super().__init__("; ".join(f"{k}: {v}" for k, v in errors.items()))
         self.errors = errors
+
+
+_EMAIL_RE = re.compile(r"^[^@\s,;]+@[^@\s,;]+\.[^@\s,;]+$")
+
+
+def is_email(text: str) -> bool:
+    return bool(_EMAIL_RE.match(text or ""))
 
 
 _TIN_RE = re.compile(r"^(\d{9})(\d{3}|\d{5})?$")
@@ -153,6 +162,9 @@ def invoice_from_form(form: dict) -> Invoice:
     buyer_name = _text(form, "buyer_name", "Client name", errors)
     buyer_address = _text(form, "buyer_address", "Client address", errors)
     business_style = _text(form, "business_style", "Business style", errors, required=False)
+    buyer_email = _text(form, "buyer_email", "Client e-mail", errors, required=False)
+    if buyer_email and "buyer_email" not in errors and not is_email(buyer_email):
+        errors["buyer_email"] = "Client e-mail is not a valid address (one address only)."
     rate_source = _text(form, "rate_source", "Rate source", errors)
     rate_date = _parse_date(form.get("rate_date"), "Rate date", errors, "rate_date")
 
@@ -212,6 +224,7 @@ def invoice_from_form(form: dict) -> Invoice:
     return Invoice(
         issue_date=issue_date, buyer_name=buyer_name, buyer_tin=buyer_tin,
         buyer_branch=buyer_branch, buyer_address=buyer_address,
-        business_style=business_style, rate=rate, rate_date=rate_date,
+        business_style=business_style, buyer_email=buyer_email,
+        rate=rate, rate_date=rate_date,
         rate_source=rate_source, lines=lines,
     ).compute()

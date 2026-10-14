@@ -64,7 +64,7 @@ def build(inv: Invoice, cfg: Config) -> dict:
             # The EIS has no "business style" field; BusinessNm is the
             # business *name*, which for these clients is the registered name.
             "BusinessNm": inv.buyer_name,
-            "Email": "",
+            "Email": inv.buyer_email,
             "RegAddr": inv.buyer_address,
             "DevAddr": "",
             # Airway bill / bill of lading: exporters of goods only.

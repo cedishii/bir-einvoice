@@ -79,6 +79,22 @@ MIGRATIONS = [
         PRIMARY KEY (submit_id, eis_unique_id)
     );
     """,
+    # 4: client e-mail and the e-mails sent with invoices
+    """
+    ALTER TABLE invoices ADD COLUMN buyer_email TEXT NOT NULL DEFAULT '';
+    CREATE TABLE invoice_emails (
+        id          INTEGER PRIMARY KEY,
+        invoice_id  INTEGER NOT NULL REFERENCES invoices(id),
+        sent_at     TEXT NOT NULL,
+        to_addr     TEXT NOT NULL,
+        cc          TEXT NOT NULL DEFAULT '',
+        subject     TEXT NOT NULL,
+        status      TEXT NOT NULL CHECK (status IN ('sent', 'failed')),
+        error       TEXT NOT NULL DEFAULT '',
+        test        INTEGER NOT NULL DEFAULT 0,
+        automatic   INTEGER NOT NULL DEFAULT 0
+    );
+    """,
 ]
 
 
