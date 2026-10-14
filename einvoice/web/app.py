@@ -332,6 +332,10 @@ def create_app(config: Config | None = None, transport: TransportSettings | None
             return f"Checked {len(out)} submission(s): {done} completed."
         return bir_action(go, url_for("bir_page"))
 
+    @app.get("/favicon.ico")
+    def favicon():
+        return send_file(LOGO_PATH.with_name("app.ico"), mimetype="image/x-icon", max_age=3600)
+
     @app.get("/logo.png")
     def logo():
         return send_file(LOGO_PATH, mimetype="image/png", max_age=3600)

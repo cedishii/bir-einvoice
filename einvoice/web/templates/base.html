@@ -4,11 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Service Invoices{% endblock %} · Micronet e-Invoice</title>
+  <link rel="icon" href="{{ url_for('favicon') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   <script>
-    // Restore the sidebar's width / collapsed state before the page paints.
+    // Before the page paints: the sidebar width is remembered on this computer;
+    // whether it's hidden only lasts while the window is open, so the app
+    // always starts with the sidebar open.
     try {
-      if (localStorage.getItem("sidebar") === "collapsed") document.documentElement.classList.add("sb-collapsed");
+      if (sessionStorage.getItem("sidebar") === "collapsed") document.documentElement.classList.add("sb-collapsed");
       const w = parseInt(localStorage.getItem("sidebarWidth"), 10);
       if (w) document.documentElement.style.setProperty("--sb-w", w + "px");
     } catch (e) {}
@@ -18,26 +21,29 @@
 {% set ep = request.endpoint or "" %}
 <div class="layout">
   <button type="button" class="sb-toggle" id="sb-toggle" aria-label="Hide menu" title="Hide menu">
-    <span class="when-open">&laquo;</span><span class="when-closed">&raquo;</span>
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor"
+         stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M11 17l-5-5 5-5M18 17l-5-5 5-5"/>
+    </svg>
   </button>
   <aside class="sidebar" id="sidebar">
-    <div class="sb-handle" id="sb-handle" title="Drag to resize; drag far left to hide"></div>
+    <div class="sb-handle" id="sb-handle" title="Drag to resize. Drag to the left to hide."></div>
     <a class="brand" href="{{ url_for('index') }}">
       <img src="{{ url_for('logo') }}" alt="Micronet Software Manila, Inc.">
-      <span>e-Invoice <small>BIR EIS v2.1</small></span>
+      <span class="label">e-Invoice <small>BIR EIS v2.1</small></span>
     </a>
     <nav>
-      <a href="{{ url_for('index') }}"
+      <a href="{{ url_for('index') }}" title="Invoices"
          class="{{ 'active' if ep in ('index', 'show_invoice', 'test_export_invoice') }}">
-        <span class="icon">&#9776;</span> Invoices</a>
-      <a href="{{ url_for('new_invoice') }}"
+        <span class="icon">&#9776;</span><span class="label">Invoices</span></a>
+      <a href="{{ url_for('new_invoice') }}" title="New invoice"
          class="{{ 'active' if ep in ('new_invoice', 'review_invoice', 'edit_invoice', 'issue_invoice') }}">
-        <span class="icon">&#43;</span> New invoice</a>
-      <a href="{{ url_for('bir_page') }}" class="{{ 'active' if ep.startswith('bir') }}">
-        <span class="icon">&#8645;</span> BIR
-        {% if not transport.is_sandbox %}<span class="badge live">LIVE</span>{% endif %}</a>
+        <span class="icon">&#43;</span><span class="label">New invoice</span></a>
+      <a href="{{ url_for('bir_page') }}" title="BIR" class="{{ 'active' if ep.startswith('bir') }}">
+        <span class="icon">&#8645;</span><span class="label">BIR
+        {% if not transport.is_sandbox %}<span class="badge live">LIVE</span>{% endif %}</span></a>
     </nav>
-    <div class="sidebar-foot">
+    <div class="sidebar-foot label">
       {% if cfg.is_prototype %}<span class="badge unconfirmed">prototype</span>{% endif %}
       <small>{{ cfg.seller.reg_nm }}</small>
     </div>
@@ -65,37 +71,50 @@
 </div>
 
 <script>
-  // Sidebar: slides out to the left («) and back (»); the page slides
-  // with it. Its right edge can be dragged to resize; dragged narrow enough,
-  // it slides away. Remembered per computer (browser storage).
+  // Sidebar. The toggle slides it out to the left and back; the page and the
+  // toggle glide along. Its right edge (the grip) can be dragged: the sidebar
+  // shrinks with the pointer, drops its labels when narrow, and if let go
+  // narrow enough it glides away from where it is.
   (() => {
     const root = document.documentElement, side = document.getElementById("sidebar");
     const toggle = document.getElementById("sb-toggle");
-    const MIN = 170, MAX = 360, HIDE_BELOW = 120;
-    const save = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+    const MIN = 170, MAX = 360, NARROW = 150, HIDE_BELOW = 100, FLOOR = 48, DEFAULT = 220;
+    const local = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+    const session = (k, v) => { try { sessionStorage.setItem(k, v); } catch (e) {} };
+    const width = () => side.getBoundingClientRect().width;
+    const isCollapsed = () => root.classList.contains("sb-collapsed");
+    const setWidth = (w) => {
+      root.style.setProperty("--sb-w", w + "px");
+      root.classList.toggle("sb-narrow", w < NARROW);
+    };
     const label = () => {
-      const text = root.classList.contains("sb-collapsed") ? "Show menu" : "Hide menu";
+      const text = isCollapsed() ? "Show menu" : "Hide menu";
       toggle.title = text; toggle.setAttribute("aria-label", text);
     };
+    let settle;
     const collapse = (yes) => {
+      clearTimeout(settle);
       root.classList.add("sb-animate");  // animate clicks, not page loads
+      root.classList.toggle("sb-opening", !yes);
       root.classList.toggle("sb-collapsed", yes);
-      save("sidebar", yes ? "collapsed" : "open");
+      session("sidebar", yes ? "collapsed" : "open");
       label();
+      if (!yes) settle = setTimeout(() => root.classList.remove("sb-opening"), 700);
     };
+    setWidth(width());
     label();
-    toggle.onclick = () => collapse(!root.classList.contains("sb-collapsed"));
+    toggle.onclick = () => collapse(!isCollapsed());
 
     const handle = document.getElementById("sb-handle");
     handle.addEventListener("pointerdown", (e) => {
       e.preventDefault();
       handle.setPointerCapture(e.pointerId);
       const left = side.getBoundingClientRect().left;
-      const start = side.getBoundingClientRect().width;
+      const start = width();
       root.classList.add("sb-dragging");
       const move = (ev) => {
-        const w = Math.min(MAX, ev.clientX - left);
-        root.style.setProperty("--sb-w", Math.max(w, 40) + "px");
+        const w = Math.max(FLOOR, Math.min(MAX, ev.clientX - left));
+        setWidth(w);
         side.classList.toggle("sb-will-hide", w < HIDE_BELOW);
       };
       const up = (ev) => {
@@ -105,13 +124,16 @@
         side.classList.remove("sb-will-hide");
         const w = Math.min(MAX, ev.clientX - left);
         if (w < HIDE_BELOW) {
-          root.style.setProperty("--sb-w", start + "px");  // reopens at the old width
+          // Glide away from the current width, then quietly restore the
+          // previous width so the sidebar reopens the way it was.
           collapse(true);
+          setTimeout(() => { if (isCollapsed()) setWidth(start >= MIN ? start : DEFAULT); }, 450);
           return;
         }
-        const width = Math.max(MIN, w);
-        root.style.setProperty("--sb-w", width + "px");
-        save("sidebarWidth", String(width));
+        const final = Math.max(MIN, w);
+        root.classList.add("sb-animate");
+        setWidth(final);
+        local("sidebarWidth", String(final));
       };
       handle.addEventListener("pointermove", move);
       handle.addEventListener("pointerup", up);

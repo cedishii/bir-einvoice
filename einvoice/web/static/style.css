@@ -15,57 +15,92 @@ a { color: var(--accent-dark); }
 code { background: #eee; padding: 0 4px; border-radius: 3px; }
 main { max-width: 1100px; margin: 0 auto; padding: 20px 16px 60px; }
 
-/* Layout: the sidebar is fixed on the left and slides out of view; the page
-   (its margin) and the toggle button move with it, same speed and easing. */
-:root { --sb-w: 220px; --sb-ease: cubic-bezier(.4, 0, .2, 1); --sb-time: .3s; }
+/* Layout: the sidebar is fixed on the left and slides out of view. The page
+   (its margin) and the toggle button glide along with it. */
+:root {
+  --sb-w: 220px;
+  --sb-open: .48s cubic-bezier(.22, 1, .36, 1);   /* glides out, settles softly */
+  --sb-close: .34s cubic-bezier(.55, 0, .7, .2);  /* tucks away briskly */
+}
 .sidebar { position: fixed; top: 0; left: 0; bottom: 0; width: var(--sb-w); z-index: 20;
            background: #141416; color: #ddd; display: flex; flex-direction: column;
-           box-shadow: 4px 0 18px rgba(0, 0, 0, .18); }
+           box-shadow: 6px 0 24px rgba(0, 0, 0, .22); }
 .content { margin-left: var(--sb-w); min-width: 0; }
 main { padding-bottom: 100px; } /* room for the New invoice button */
+
 .sb-toggle { position: fixed; top: 10px; left: calc(var(--sb-w) + 10px); z-index: 21;
-             width: 34px; height: 34px; border-radius: 9px; cursor: pointer;
+             width: 34px; height: 34px; border-radius: 10px; cursor: pointer; padding: 0;
              display: flex; align-items: center; justify-content: center;
-             font-size: 19px; line-height: 1; padding: 0 0 2px;
-             background: rgba(255, 255, 255, .92); color: #444; border: 1px solid rgba(0, 0, 0, .12);
-             box-shadow: 0 2px 6px rgba(0, 0, 0, .12); }
-.sb-toggle:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
-.sb-toggle .when-closed { display: none; }
-.sb-collapsed .sb-toggle .when-open { display: none; }
-.sb-collapsed .sb-toggle .when-closed { display: inline; }
+             background: rgba(255, 255, 255, .94); color: #444; border: 1px solid rgba(0, 0, 0, .12);
+             box-shadow: 0 2px 8px rgba(0, 0, 0, .12); }
+.sb-toggle:hover { background: var(--accent); color: #fff; border-color: var(--accent); transform: scale(1.06); }
+.sb-toggle:active { transform: scale(.94); }
+.sb-toggle svg { transition: transform var(--sb-open); }
+.sb-collapsed .sb-toggle svg { transform: rotate(180deg); }
 
 .sb-collapsed .sidebar { transform: translateX(-100%); box-shadow: none; }
 .sb-collapsed .content { margin-left: 0; }
 .sb-collapsed .sb-toggle { left: 10px; }
-/* Only animate when the user toggles (not on page load or while dragging). */
-.sb-animate .sidebar { transition: transform var(--sb-time) var(--sb-ease), box-shadow var(--sb-time); }
-.sb-animate .content { transition: margin-left var(--sb-time) var(--sb-ease); }
-.sb-animate .sb-toggle { transition: left var(--sb-time) var(--sb-ease), background .15s, color .15s; }
+
+/* Animate only after the user acts (never on page load or while dragging). */
+.sb-animate .sidebar { transition: transform var(--sb-open), box-shadow var(--sb-open), width var(--sb-open); }
+.sb-animate .content { transition: margin-left var(--sb-open); }
+.sb-animate .sb-toggle { transition: left var(--sb-open), background .15s, color .15s, transform .15s; }
+.sb-animate.sb-collapsed .sidebar { transition: transform var(--sb-close), box-shadow var(--sb-close), width var(--sb-close); }
+.sb-animate.sb-collapsed .content { transition: margin-left var(--sb-close); }
+.sb-animate.sb-collapsed .sb-toggle { transition: left var(--sb-close), background .15s, color .15s, transform .15s; }
 .sb-dragging .sidebar, .sb-dragging .content, .sb-dragging .sb-toggle { transition: none !important; }
 .sb-dragging, .sb-dragging * { cursor: col-resize !important; user-select: none; }
-.sidebar.sb-will-hide { opacity: .45; }
-.sb-handle { position: absolute; top: 0; right: -3px; width: 7px; height: 100%; cursor: col-resize; z-index: 5; }
-.sb-handle:hover { background: rgba(200, 16, 46, .45); }
+
+/* Opening: the logo and menu items drift in one after another. */
+@keyframes sb-item-in { from { opacity: 0; transform: translateX(-14px); } to { opacity: 1; transform: none; } }
+.sb-opening .sidebar .brand,
+.sb-opening .sidebar nav a,
+.sb-opening .sidebar-foot { animation: sb-item-in .45s cubic-bezier(.22, 1, .36, 1) both; }
+.sb-opening .sidebar .brand { animation-delay: .06s; }
+.sb-opening .sidebar nav a:nth-child(1) { animation-delay: .12s; }
+.sb-opening .sidebar nav a:nth-child(2) { animation-delay: .17s; }
+.sb-opening .sidebar nav a:nth-child(3) { animation-delay: .22s; }
+.sb-opening .sidebar-foot { animation-delay: .27s; }
+
+/* The grip on the right edge: drag it to resize, or to the left to hide. */
+.sb-handle { position: absolute; top: 0; right: -4px; width: 9px; height: 100%; cursor: col-resize; z-index: 5; }
+.sb-handle::after { content: ""; position: absolute; top: 50%; left: 2px; width: 5px; height: 44px; margin-top: -22px;
+                    border-radius: 3px; background: #3a3a40; transition: background .15s, height .15s, margin .15s; }
+.sidebar:hover .sb-handle::after { background: #5a5a62; }
+.sb-handle:hover::after, .sb-dragging .sb-handle::after { background: var(--accent); height: 72px; margin-top: -36px; }
+.sidebar.sb-will-hide { opacity: .5; }
+
+/* Narrow sidebar (while shrinking it): labels fade, icons stay. */
+.sidebar .label { transition: opacity .18s; }
+.sb-narrow .sidebar .label { opacity: 0; pointer-events: none; }
+.sb-narrow .sidebar nav a { padding-left: 14px; }
+.sb-narrow .sidebar .brand { padding-left: 10px; padding-right: 10px; }
 
 /* Space at the top of the page for the toggle button. */
 .topline { min-height: 54px; padding-left: 54px; display: flex; align-items: stretch; }
 .topline .notice { flex: 1; padding-top: 16px; padding-bottom: 16px; }
 
 .sidebar .brand { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 20px 18px 16px;
-                  color: #fff; text-decoration: none; font-weight: 700; font-size: 17px; border-bottom: 1px solid #2a2a2e; }
-.sidebar .brand img { width: 120px; background: #fff; border-radius: 6px; padding: 6px 8px; }
+                  color: #fff; text-decoration: none; font-weight: 700; font-size: 17px; border-bottom: 1px solid #2a2a2e;
+                  white-space: nowrap; overflow: hidden; }
+.sidebar .brand img { width: min(120px, calc(var(--sb-w) - 28px)); background: #fff; border-radius: 6px; padding: 6px 8px; }
 .sidebar .brand small { display: block; font-weight: 400; color: #999; font-size: 12px; }
 .sidebar nav { display: flex; flex-direction: column; padding: 12px 0; }
 .sidebar nav a { white-space: nowrap; overflow: hidden; display: flex; align-items: center; gap: 10px; padding: 11px 20px; color: #cfcfd4; text-decoration: none;
-                 border-left: 3px solid transparent; }
+                 border-left: 3px solid transparent; transition: background .15s, color .15s, padding .2s; }
 .sidebar nav a:hover { background: #1f1f23; color: #fff; }
 .sidebar nav a.active { background: #232327; color: #fff; border-left-color: var(--accent); font-weight: 600; }
-.sidebar nav .icon { width: 18px; text-align: center; color: #888; }
+.sidebar nav .icon { width: 18px; flex: none; text-align: center; color: #888; }
 .sidebar nav a.active .icon { color: var(--accent); }
-.sidebar-foot { margin-top: auto; padding: 14px 18px; border-top: 1px solid #2a2a2e; display: flex; flex-direction: column; gap: 6px; }
+.sidebar-foot { margin-top: auto; padding: 14px 18px; border-top: 1px solid #2a2a2e; display: flex; flex-direction: column; gap: 6px;
+                white-space: nowrap; overflow: hidden; }
 .sidebar-foot small { color: #777; font-size: 11px; }
-.content { flex: 1; min-width: 0; }
-main { padding-bottom: 100px; } /* room for the New invoice button */
+
+@media (prefers-reduced-motion: reduce) {
+  .sb-animate .sidebar, .sb-animate .content, .sb-animate .sb-toggle, .sb-toggle svg { transition: none !important; }
+  .sb-opening .sidebar * { animation: none !important; }
+}
 
 .fab { position: fixed; right: 28px; bottom: 28px; display: flex; align-items: center; gap: 8px;
        background: var(--accent); color: #fff; text-decoration: none; font-weight: 600;
