@@ -1,0 +1,55 @@
+{
+  "CompInvoiceId": "0001773",
+  "IssueDtm": "20241125",
+  "EisUniqueId": "2024112520TEST00ABCD1234",
+  "DocType": "01",
+  "TransClass": "02",
+  "CorrYN": "N",
+  "CorrectionCd": "",
+  "PrevUniqueId": "",
+  "Rmk1": "",
+  "SellerInfo": {
+    "Tin": "002372466",
+    "BranchCd": "00000",
+    "Type": "0",
+    "RegNm": "MICRONET SOFTWARE MANILA, INC.",
+    "BusinessNm": "MICRONET SOFTWARE MANILA, INC.",
+    "Email": "",
+    "RegAddr": "Unit 8A&B Cypress Gardens, 112 V.A. Rufino St., Legaspi Village, Makati City"
+  },
+  "BuyerInfo": {
+    "Tin": "000000000",
+    "BranchCd": "00000",
+    "RegNm": "MICRONET CO., LTD.",
+    "BusinessNm": "MICRONET CO., LTD.",
+    "Email": "",
+    "RegAddr": "SAPPORO, JAPAN",
+    "DevAddr": "",
+    "AirNum": "", "AirNumDt": "", "LadNum": "", "LadNumDt": ""
+  },
+  "ItemList": [
+    {
+      "Nm": "IT Services",
+      "Desc": "IT services rendered for Nov 2024",
+      "Qty": 1,
+      "Unit": "LOT",
+      "UnitCost": 4560000.00,
+      "SalesAmt": 4560000.00,
+      "RegDscntAmt": 0.00,
+      "SpeDscntAmt": 0.00,
+      "NetSales": 4560000.00
+    }
+  ],
+  "TotNetItemSales": 4560000.00,
+  "Discount": { "ScAmt": 0.00, "PwdAmt": 0.00, "RegAmt": 0.00, "SpeAmt": 0.00, "Rmk2": "" },
+  "OtherTaxRev": 0.00,
+  "TotNetSalesAftDisct": 4560000.00,
+  "VATAmt": 0.00,
+  "WithholdIncome": 0.00,
+  "WithholdBusVAT": 0.00,
+  "WithholdBusPT": 0.00,
+  "OtherNonTaxCharge": 0.00,
+  "NetAmtPay": 4560000.00,
+  "ForCur": { "Currency": "JPY", "ForexAmt": 12000000.00, "ConvRate": 0.38 },
+  "PtuNum": "TEST-PTU-NOT-VALID"
+}
