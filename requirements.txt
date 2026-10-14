@@ -3,3 +3,5 @@ reportlab==5.0.1
 python-dotenv==1.2.4
 pytest==9.1.1
 cryptography==50.0.2
+# Desktop app window (uses Microsoft Edge WebView2, part of Windows 11)
+pywebview==6.2.1

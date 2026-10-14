@@ -142,6 +142,17 @@
   })();
 </script>
 
+<script>
+  // In the desktop app window (einvoice/desktop.py), links meant for a new tab,
+  // like the invoice PDF, open in their own window instead of replacing this page.
+  document.addEventListener("click", (e) => {
+    const a = e.target.closest("a[target=_blank]");
+    if (!a || !(window.pywebview && window.pywebview.api && window.pywebview.api.open_window)) return;
+    e.preventDefault();
+    window.pywebview.api.open_window(a.href, a.dataset.windowTitle || a.textContent.trim());
+  });
+</script>
+
 {% if ep not in ('new_invoice', 'review_invoice', 'edit_invoice', 'issue_invoice') %}
 <a class="fab" href="{{ url_for('new_invoice') }}" title="New invoice">
   <span>+</span> New invoice

@@ -33,6 +33,9 @@ from werkzeug.serving import make_server
 from .config import load_config
 from .web.app import create_app
 
+APP_ID = "Micronet.eInvoice"   # Windows AppUserModelID, also set on the shortcut
+APP_TITLE = "Micronet e-Invoice"
+ICON_PATH = Path(__file__).resolve().parent.parent / "assets" / "app.ico"
 HOST = "127.0.0.1"
 PREFERRED_PORT = 5000
 WINDOW_SIZE = "1280,900"
@@ -165,24 +168,97 @@ def message_box(text: str, title: str = "Micronet e-Invoice") -> None:
         print(text, file=sys.stderr)
 
 
-def main() -> None:
-    cfg = load_config()
-    profile = cfg.data_dir / "window-profile"  # the app window's own browser profile
+def set_app_id() -> None:
+    """Group this process's windows under our own taskbar entry, not Python's."""
+    try:
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(APP_ID)
+    except Exception:
+        pass
 
-    if already_running(PREFERRED_PORT):
-        open_window(f"http://{HOST}:{PREFERRED_PORT}/", profile)
-        return
 
+def start_server(cfg, presence: "Presence | None" = None):
     port = PREFERRED_PORT if port_free(PREFERRED_PORT) else free_port()
     app = create_app(cfg)
-    stopping = threading.Event()
-    presence = Presence(on_empty=stopping.set)
-    presence.install(app)
+    if presence is not None:
+        presence.install(app)
     server = make_server(HOST, port, app, threaded=True)
     threading.Thread(target=server.serve_forever, daemon=True).start()
-    threading.Thread(target=presence.watch, daemon=True).start()
+    return server, port
 
-    open_window(f"http://{HOST}:{port}/", profile)
+
+def _set_icon(window) -> None:
+    """Use the company logo as the window icon (instead of Python's)."""
+    try:
+        import clr  # pythonnet, installed with pywebview
+        clr.AddReference("System.Drawing")
+        from System import Action
+        from System.Drawing import Icon
+        form = window.native
+        icon = Icon(str(ICON_PATH))
+        # WinForms objects must be changed on the window's own thread.
+        form.Invoke(Action(lambda: setattr(form, "Icon", icon)))
+    except Exception:
+        pass
+
+
+class WindowApi:
+    """Called from the page (window.pywebview.api) in the native window."""
+
+    def open_window(self, url: str, title: str = "") -> None:
+        """Links that would open a new tab (the invoice PDF) get their own
+        window, so the main window keeps its page."""
+        import webview
+        if not url.startswith(f"http://{HOST}:"):
+            return  # only this app's own pages
+        w = webview.create_window(title or APP_TITLE, url, width=900, height=1000)
+        w.events.shown += lambda: _set_icon(w)
+
+
+def native_window(url: str) -> None:
+    """Show `url` in a native window; returns when the window is closed."""
+    import webview
+
+    webview.settings["ALLOW_DOWNLOADS"] = True                   # Download PDF / JSON
+    webview.settings["OPEN_EXTERNAL_LINKS_IN_BROWSER"] = False
+    window = webview.create_window(APP_TITLE, url, width=1320, height=880, min_size=(900, 600),
+                                   js_api=WindowApi())
+    window.events.shown += lambda: _set_icon(window)
+    webview.start(gui="edgechromium", private_mode=False,
+                  storage_path=str(load_config().data_dir / "webview"))
+
+
+def main() -> None:
+    set_app_id()
+    cfg = load_config()
+
+    if already_running(PREFERRED_PORT):
+        url = f"http://{HOST}:{PREFERRED_PORT}/"
+        try:
+            native_window(url)
+        except Exception:
+            open_window(url, cfg.data_dir / "window-profile")
+        return
+
+    try:
+        import webview  # noqa: F401
+        native = True
+    except Exception:
+        native = False
+
+    if native:
+        server, port = start_server(cfg)
+        try:
+            native_window(f"http://{HOST}:{port}/")
+            return
+        except Exception:
+            # WebView2 unavailable: fall back to the browser app window below.
+            server.shutdown()
+
+    stopping = threading.Event()
+    presence = Presence(on_empty=stopping.set)
+    server, port = start_server(cfg, presence)
+    threading.Thread(target=presence.watch, daemon=True).start()
+    open_window(f"http://{HOST}:{port}/", cfg.data_dir / "window-profile")
     stopping.wait()
     server.shutdown()
 

@@ -24,8 +24,10 @@ ways to open it, and both use the same data.
 **As a desktop app (own window).** Run **`Create desktop shortcut.bat`**
 once. It sets everything up and adds a **Micronet e-Invoice** shortcut, with
 the logo, to the desktop and the Start menu. The shortcut opens the app in its
-own window, with no browser tabs and no black console window. Closing the
-window shuts the app down.
+own window: no browser, no black console window. It has its own taskbar icon,
+so you can pin it (right-click the icon on the taskbar → **Pin to taskbar**).
+Invoice PDFs open in a separate window. Closing the main window shuts the
+app down. The window uses Microsoft Edge WebView2, which comes with Windows 11.
 
 **In the browser.** Double-click **`run.bat`**. The app opens in your normal
 browser at <http://127.0.0.1:5000>, next to your other tabs. Keep the black
