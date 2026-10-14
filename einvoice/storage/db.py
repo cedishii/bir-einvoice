@@ -59,6 +59,26 @@ MIGRATIONS = [
         sha256         TEXT NOT NULL
     );
     """,
+    # 3: submissions to BIR (phase 3) and the result per e-invoice
+    """
+    CREATE TABLE eis_submissions (
+        submit_id       TEXT PRIMARY KEY,
+        sent_at         TEXT NOT NULL,
+        base_url        TEXT NOT NULL,
+        ack_id          TEXT NOT NULL DEFAULT '',
+        response_dtm    TEXT NOT NULL DEFAULT '',
+        process_status  TEXT NOT NULL DEFAULT '',
+        fail_reason     TEXT NOT NULL DEFAULT '',
+        last_checked_at TEXT NOT NULL DEFAULT '',
+        error           TEXT NOT NULL DEFAULT ''
+    );
+    CREATE TABLE eis_submission_items (
+        submit_id      TEXT NOT NULL REFERENCES eis_submissions(submit_id),
+        eis_unique_id  TEXT NOT NULL REFERENCES eis_exports(eis_unique_id),
+        result_code    TEXT NOT NULL DEFAULT '',
+        PRIMARY KEY (submit_id, eis_unique_id)
+    );
+    """,
 ]
 
 
