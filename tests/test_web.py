@@ -45,7 +45,7 @@ def test_issue_view_pdf_and_void(client):
     assert "0001774" in client.get("/").get_data(as_text=True)  # next number
 
     detail = client.get("/invoices/0001773").get_data(as_text=True)
-    assert "MICRONET CO., LTD." in detail and "Void this invoice" in detail
+    assert "MICRONET CO. LTD." in detail and "Void this invoice" in detail
 
     pdf = client.get("/invoices/0001773/pdf")
     assert pdf.mimetype == "application/pdf" and pdf.data.startswith(b"%PDF")
@@ -57,7 +57,7 @@ def test_issue_view_pdf_and_void(client):
 def test_new_form_copies_last_client_but_not_the_rate(client):
     client.post("/invoices/issue", data=form() | {"token": "t2"})
     page = client.get("/invoices/new").get_data(as_text=True)
-    assert 'value="MICRONET CO., LTD."' in page
+    assert 'value="MICRONET CO. LTD."' in page
     assert 'name="rate" value=""' in page
 
 
@@ -158,3 +158,19 @@ def test_send_disabled_without_settings(config):
     c.post("/invoices/0001773/export")
     r = c.post("/invoices/0001773/send", follow_redirects=True)
     assert "needs the BIR settings" in r.get_data(as_text=True)
+
+
+def test_philippine_client_tin_typed_by_hand(client, config):
+    import json
+    from einvoice.eis import builder
+    from einvoice.web.app import create_app
+    data = form(buyer_name="ACME PHILIPPINES, INC.", buyer_tin="123-456-789-00101",
+                buyer_address="Makati City") | {"token": "ph1"}
+    client.post("/invoices/issue", data=data)
+    detail = client.get("/invoices/0001773").get_data(as_text=True)
+    assert "123-456-789-00101" in detail
+    pdf = client.get("/invoices/0001773/pdf").data
+    pymupdf = pytest.importorskip("pymupdf")
+    assert "123-456-789-00101" in pymupdf.open(stream=pdf)[0].get_text()
+    page = client.post("/invoices/0001773/test-export").get_data(as_text=True)
+    assert "&#34;Tin&#34;: &#34;123456789&#34;" in page and "&#34;BranchCd&#34;: &#34;00101&#34;" in page

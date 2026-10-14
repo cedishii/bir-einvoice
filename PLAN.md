@@ -174,6 +174,12 @@ Added while building phase 2:
 - `NetAmtPay` is the invoice's total payment (confirmed by the user): sales
   after discounts + VAT + other charges - amounts withheld by the buyer. For
   Micronet's zero-rated invoices it equals the PDF's TOTAL AMOUNT DUE (PHP).
+- 2026-10-14, user: the printed invoice (and e-mail) does not show the exchange
+  rate, rate date or source; they are still entered, saved and sent to BIR.
+- 2026-10-14, user: the client's name is "MICRONET CO. LTD." (no comma); test
+  data and the draft in docs/EIS_SPEC_NOTES.md section 5 updated.
+- Client TIN can be typed for Philippine clients; blank = foreign client
+  (N/A on the invoice, 000000000 to BIR).
 - Still to confirm against the official downloaded spec: ConvRate with more than
   2 decimals (the validator allows up to 6).
 

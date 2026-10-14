@@ -37,7 +37,8 @@ running app.
 ## Using it
 
 1. **+ New invoice.** Fill in the date, client (with their e-mail), the "payment for" lines in JPY,
-   and the exchange rate (PHP per 1 JPY) with its date and source. The client
+   and the exchange rate (PHP per 1 JPY) with its date and source (kept on file
+   and sent to BIR, but not printed on the invoice). The client
    details are copied from the last invoice; the rate never is.
 2. **Review invoice.** Check the PHP amounts. Nothing is saved yet.
 3. **Issue invoice No. …** saves it with the next control number.
@@ -107,7 +108,8 @@ Some protocol details are marked *unconfirmed* on the BIR page. See
 
 - PHP unit price = JPY unit price × rate, rounded half up to centavos.
 - PHP line amount = quantity × PHP unit price. Totals are the sum of the lines.
-- The rate is kept exactly as entered (up to 6 decimals) and printed on the invoice.
+- The rate is kept exactly as entered (up to 6 decimals). It is not printed on
+  the invoice or in the e-mail; it is sent to BIR as `ForCur.ConvRate`.
 - VAT is always 0.00 (zero-rated export of services).
 
 ## Settings (`.env`)

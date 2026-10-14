@@ -22,7 +22,7 @@ from typing import Callable
 
 from .config import Config
 from .models import PH_TZ, Invoice, is_email
-from .money import fmt, fmt_rate
+from .money import fmt
 from .pdf.service_invoice import render as render_pdf
 
 SECURITY = ("starttls", "ssl", "none")
@@ -127,8 +127,7 @@ def build_message(inv: Invoice, cfg: Config, settings: EmailSettings, pdf: bytes
         f"{inv.issue_date.strftime('%B %d, %Y')}.",
         "",
         f"  Amount:          JPY {fmt(inv.total_jpy)}",
-        f"  PHP equivalent:  PHP {fmt(inv.total_php)} "
-        f"(at PHP {fmt_rate(inv.rate)} per JPY 1)",
+        f"  PHP equivalent:  PHP {fmt(inv.total_php)}",
         "  Sale type:       Zero-rated sale (export of services)",
         "",
         *(f"  {line.description}" for line in inv.lines),

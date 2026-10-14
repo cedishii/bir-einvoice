@@ -20,7 +20,7 @@ from reportlab.platypus import (Image, KeepTogether, Paragraph, SimpleDocTemplat
 
 from ..config import LOGO_PATH, Config
 from ..models import PH_TZ, Invoice
-from ..money import ZERO, amount_in_words, fmt, fmt_qty, fmt_rate
+from ..money import ZERO, amount_in_words, fmt, fmt_qty
 
 INK = colors.HexColor("#1a1a1a")
 MUTED = colors.HexColor("#555555")
@@ -166,13 +166,11 @@ def _lines(inv: Invoice):
 
 
 def _summary(inv: Invoice):
-    # Left: totals in JPY, the rate used and the amount in words.
+    # Left: totals in JPY and PHP and the amount in words. The exchange rate
+    # itself is not printed (company decision); it is kept with the invoice
+    # and sent to BIR as ForCur.ConvRate.
     left_rows = [
         [_p("TOTAL AMOUNT (JPY)", S_LABEL), _p(_money(inv.total_jpy), S_RIGHT_B)],
-        [_p("EXCHANGE RATE", S_LABEL),
-         _p(f"PHP {fmt_rate(inv.rate)} per JPY 1", S_RIGHT)],
-        [_p("RATE DATE", S_LABEL), _p(inv.rate_date.strftime("%B %d, %Y"), S_RIGHT)],
-        [_p("RATE SOURCE", S_LABEL), _p(inv.rate_source, S_RIGHT)],
         [_p("PHP EQUIVALENT", S_LABEL), _p(_money(inv.total_php), S_RIGHT_B)],
     ]
     left = Table(left_rows, colWidths=[1.6 * inch, 1.9 * inch])
@@ -240,7 +238,7 @@ def _cas_footer(cfg: Config):
     ptu = "[to be issued by BIR]" if "PTU_NUM" in cfg.placeholders else cfg.ptu_num
     return [
         _p("This is a system-generated Service Invoice. All amounts are in Philippine pesos "
-           "(PHP) unless marked JPY; JPY amounts are converted at the exchange rate shown.",
+           "(PHP) unless marked JPY.",
            S_SMALL),
         _p(f"CAS Permit To Use / Acknowledgment Certificate No.: {ptu}", S_SMALL),
     ]

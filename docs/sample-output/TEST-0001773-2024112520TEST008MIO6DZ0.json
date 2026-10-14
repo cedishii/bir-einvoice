@@ -1,7 +1,7 @@
 {
   "CompInvoiceId": "0001773",
   "IssueDtm": "20241125",
-  "EisUniqueId": "2024112520TEST00IXLPPAH2",
+  "EisUniqueId": "2024112520TEST008MIO6DZ0",
   "DocType": "01",
   "TransClass": "02",
   "CorrYN": "N",
@@ -20,8 +20,8 @@
   "BuyerInfo": {
     "Tin": "000000000",
     "BranchCd": "00000",
-    "RegNm": "MICRONET CO., LTD.",
-    "BusinessNm": "MICRONET CO., LTD.",
+    "RegNm": "MICRONET CO. LTD.",
+    "BusinessNm": "MICRONET CO. LTD.",
     "Email": "",
     "RegAddr": "SAPPORO, JAPAN",
     "DevAddr": "",

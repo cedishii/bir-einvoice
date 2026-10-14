@@ -9,7 +9,7 @@ from einvoice.models import FormErrors, invoice_from_form, parse_tin, today_ph
 def form(**overrides):
     data = {
         "issue_date": "2024-11-25",
-        "buyer_name": "MICRONET CO., LTD.",
+        "buyer_name": "MICRONET CO. LTD.",
         "buyer_tin": "",
         "buyer_address": "SAPPORO, JAPAN",
         "business_style": "Graphic Design",

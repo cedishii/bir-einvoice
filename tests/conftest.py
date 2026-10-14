@@ -27,7 +27,7 @@ def make_invoice(**overrides) -> Invoice:
     """The required test case: invoice 0001773 (rate is an example only)."""
     fields = dict(
         issue_date=date(2024, 11, 25),
-        buyer_name="MICRONET CO., LTD.",
+        buyer_name="MICRONET CO. LTD.",
         buyer_tin="000000000",
         buyer_branch="00000",
         buyer_address="SAPPORO, JAPAN",

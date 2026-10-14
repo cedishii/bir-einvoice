@@ -186,8 +186,8 @@ Placeholders in <ANGLE_BRACKETS> come from BIR. The exchange rate (0.38 PHP per 
   "BuyerInfo": {
     "Tin": "000000000",
     "BranchCd": "00000",
-    "RegNm": "MICRONET CO., LTD.",
-    "BusinessNm": "MICRONET CO., LTD.",
+    "RegNm": "MICRONET CO. LTD.",
+    "BusinessNm": "MICRONET CO. LTD.",
     "Email": "",
     "RegAddr": "SAPPORO, JAPAN",
     "DevAddr": "",

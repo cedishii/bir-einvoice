@@ -23,13 +23,16 @@ def test_invoice_shows_required_details(repo, config):
         "SERVICE INVOICE", "No. 0001773", "November 25, 2024",
         "MICRONET SOFTWARE MANILA, INC.", "002-372-466-00000", "02-8812-8174",
         "Legaspi Village, Makati City",
-        "MICRONET CO., LTD.", "SAPPORO, JAPAN", "Graphic Design",
+        "MICRONET CO. LTD.", "SAPPORO, JAPAN", "Graphic Design",
         "IT services rendered for Nov 2024",
         "ZERO-RATED SALE", "Zero-Rated Sales",
-        "12,000,000.00", "4,560,000.00", "PHP 0.38 per JPY 1",
+        "12,000,000.00", "4,560,000.00",
         "TWELVE MILLION YEN ONLY",
     ]:
         assert expected in text, expected
+    # The exchange rate is not printed (company decision).
+    for hidden in ["EXCHANGE RATE", "RATE DATE", "RATE SOURCE", "0.38", "Example rate"]:
+        assert hidden not in text, hidden
 
 
 def test_prototype_watermark_while_bir_values_are_placeholders(repo, config):

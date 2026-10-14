@@ -40,7 +40,8 @@
     <div class="row">
       {{ field("buyer_name", "Client name") }}
       {{ field("buyer_tin", "Client TIN", required=False,
-               hint="Philippine TIN only, e.g. 123-456-789-00000. Leave blank for clients in Japan (sent to BIR as 000000000).") }}
+               hint="For clients in the Philippines, type their BIR TIN, e.g. 123-456-789-00000 (the branch code is optional, default 00000). Leave blank for foreign clients: the invoice shows N/A and BIR gets 000000000.",
+               attrs='inputmode="numeric" placeholder="123-456-789-00000" autocomplete="off"') }}
     </div>
     <div class="row">
       {{ field("buyer_address", "Client address") }}
@@ -99,6 +100,14 @@
 </form>
 
 <script>
+  // Client TIN: keep only digits and add the dashes (123-456-789-00000).
+  const tin = document.querySelector('[name="buyer_tin"]');
+  tin.addEventListener("input", () => {
+    const d = tin.value.replace(/\D/g, "").slice(0, 14);
+    const parts = [d.slice(0, 3), d.slice(3, 6), d.slice(6, 9), d.slice(9)].filter(Boolean);
+    tin.value = parts.join("-");
+  });
+
   const tbody = document.querySelector("#lines tbody");
   document.getElementById("add-line").addEventListener("click", () => {
     const row = tbody.rows[tbody.rows.length - 1].cloneNode(true);
