@@ -40,7 +40,7 @@ to stop it.
 
 - The review page already checks that the invoice will pass the EIS rules, so an
   invoice that couldn't be exported is never issued.
-- **Test export** (always available) writes `data\exports	est\TEST-….json` with
+- **Test export** (always available) writes `data\exports\test\TEST-….json` with
   dummy BIR values (`20TEST00`, `TEST-PTU-NOT-VALID`). Use it to see the JSON.
   It is never recorded and must never be sent to BIR.
 - **Export e-invoice JSON** works once `EIS_CERT_NO` and `PTU_NUM` are set in
