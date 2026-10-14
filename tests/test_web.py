@@ -63,3 +63,42 @@ def test_new_form_copies_last_client_but_not_the_rate(client):
 
 def test_unknown_invoice_404(client):
     assert client.get("/invoices/9999999").status_code == 404
+
+
+def test_review_says_eis_check_passed(client):
+    page = client.post("/invoices/review", data=form()).get_data(as_text=True)
+    assert "Passes the BIR e-invoice" in page
+
+
+def test_prototype_detail_disables_real_export(client):
+    client.post("/invoices/issue", data=form() | {"token": "t3"})
+    page = client.get("/invoices/0001773").get_data(as_text=True)
+    assert "Test export" in page and "Waiting for BIR-issued values" in page
+    r = client.post("/invoices/0001773/export")  # forced anyway
+    assert r.status_code == 422 and "LOCAL-CONFIG" in r.get_data(as_text=True)
+
+
+def test_test_export_page_and_download(client):
+    client.post("/invoices/issue", data=form() | {"token": "t4"})
+    page = client.post("/invoices/0001773/test-export").get_data(as_text=True)
+    assert "Passed every validation rule" in page and "&#34;TransClass&#34;: &#34;02&#34;" in page
+    dl = client.get("/invoices/0001773/test-export.json")
+    assert dl.headers["Content-Disposition"].startswith("attachment; filename=TEST-0001773-")
+    assert b'"NetAmtPay": 4560000.00' in dl.data
+
+
+def test_real_export_flow(config):
+    from einvoice.web.app import create_app
+    app = create_app(config.with_(eis_cert_no="20ABC123", ptu_num="PTU-0001"))
+    c = app.test_client()
+    c.post("/invoices/issue", data=form() | {"token": "t5"})
+    assert "Prototype mode" not in c.get("/").get_data(as_text=True)
+    r = c.post("/invoices/0001773/export")
+    assert r.status_code == 302
+    page = c.get("/invoices/0001773").get_data(as_text=True)
+    assert "2024112520ABC123" in page and "exported" in page
+    dl = c.get("/invoices/0001773/export.json")
+    assert b'"PtuNum": "PTU-0001"' in dl.data
+    # Exported invoices can't be silently voided.
+    c.post("/invoices/0001773/void", data={"reason": "oops"})
+    assert "already been exported" in c.get("/invoices/0001773").get_data(as_text=True)

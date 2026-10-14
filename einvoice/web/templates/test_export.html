@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Test export {{ inv.control_no }}{% endblock %}
+{% block content %}
+<div class="heading">
+  <h1>TEST export: invoice No. {{ inv.control_no }}</h1>
+  <p class="muted">This file uses dummy BIR values (EIS Cert No. <code>20TEST00</code>, PTU <code>TEST-PTU-NOT-VALID</code>). It is not recorded and must never be sent to BIR.</p>
+</div>
+<div class="flash">&check; Passed every validation rule. Saved as <code>{{ result.path.name }}</code>.</div>
+<div class="actions left">
+  <a class="button" href="{{ url_for('download_test_export', control_no=inv.control_no) }}">Download TEST JSON</a>
+  <a class="button secondary" href="{{ url_for('show_invoice', control_no=inv.control_no) }}">&larr; Back to invoice</a>
+</div>
+<pre class="json">{{ result.json_text }}</pre>
+{% endblock %}

@@ -99,3 +99,6 @@ details.danger { border: 1px solid #f2b8c0; }
   table.lines thead { display: none; }
   table.lines tr { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 8px 0; border-bottom: 1px solid var(--line); }
 }
+
+section.card h2 { margin: 0 0 10px; font-size: 18px; }
+pre.json { background: #1e1e24; color: #e8e8ee; padding: 16px 20px; border-radius: 8px; overflow-x: auto; font-size: 13px; line-height: 1.5; }

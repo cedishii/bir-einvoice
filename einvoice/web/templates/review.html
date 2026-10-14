@@ -6,6 +6,15 @@
   <p class="muted">Check everything. After you issue it, the invoice can't be edited, only voided, and No. <strong>{{ next_no }}</strong> is used.</p>
 </div>
 
+{% if problems %}
+<div class="flash error">
+  This invoice would not pass the BIR e-invoice check, so it can't be issued:
+  <ul>{% for p in problems %}<li>{{ p }}</li>{% endfor %}</ul>
+</div>
+{% else %}
+<div class="flash">&check; Passes the BIR e-invoice (EIS v2.1) checks.</div>
+{% endif %}
+
 <div class="card">
   {% include "_summary.html" %}
 </div>
@@ -19,7 +28,7 @@
         onsubmit="this.querySelector('button').disabled = true">
     {% include "_hidden.html" %}
     <input type="hidden" name="token" value="{{ token }}">
-    <button type="submit" class="button">Issue invoice No. {{ next_no }}</button>
+    <button type="submit" class="button" {% if problems %}disabled{% endif %}>Issue invoice No. {{ next_no }}</button>
   </form>
 </div>
 {% endblock %}

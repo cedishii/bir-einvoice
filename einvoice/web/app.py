@@ -11,6 +11,9 @@ from .. import money
 from ..config import LOGO_PATH, Config, load_config
 from ..models import (DEFAULT_ITEM_NAME, DEFAULT_UNIT, MAX_LEN, FormErrors,
                       invoice_from_form, today_ph)
+from ..eis import builder
+from ..eis import export as eis_export
+from ..eis.export import ExportRefused
 from ..pdf.service_invoice import render as render_pdf
 from ..storage.db import connect
 from ..storage.repository import Repository
@@ -92,9 +95,11 @@ def create_app(config: Config | None = None) -> Flask:
             inv = invoice_from_form(data)
         except FormErrors as e:
             return render_form(data, e.errors, status=422)
+        next_no = repo().next_control_no()
+        problems = eis_export.precheck(inv, cfg(), next_no)
         return render_template("review.html", inv=inv, data=data, rows=list(
             zip(*(data[k + "[]"] for k in LINE_FIELDS))), token=secrets.token_hex(16),
-            next_no=repo().next_control_no())
+            next_no=next_no, problems=problems)
 
     @app.post("/invoices/edit")
     def edit_invoice():
@@ -110,6 +115,11 @@ def create_app(config: Config | None = None) -> Flask:
             inv = invoice_from_form(data)
         except FormErrors as e:
             return render_form(data, e.errors, status=422)
+        # Never issue an invoice that couldn't later be exported to EIS.
+        problems = eis_export.precheck(inv, cfg(), repo().next_control_no())
+        if problems:
+            return render_form(data, {f"eis{i}": f"BIR e-invoice check: {p}"
+                                      for i, p in enumerate(problems)}, status=422)
         inv = repo().issue(inv)
         issued_tokens[token] = inv.control_no
         flash(f"Service Invoice No. {inv.control_no} issued.")
@@ -121,9 +131,55 @@ def create_app(config: Config | None = None) -> Flask:
             abort(404)
         return inv
 
+    def render_detail(inv, issues=None, status=200):
+        exported = eis_export.existing_export(repo().conn, cfg(), inv)
+        return render_template("detail.html", inv=inv, exported=exported,
+                               issues=issues or [], eis_id=_eis_id(inv)), status
+
+    def _eis_id(inv):
+        if cfg().is_prototype:
+            return None
+        return builder.eis_unique_id(inv, cfg())
+
     @app.get("/invoices/<control_no>")
     def show_invoice(control_no):
-        return render_template("detail.html", inv=get_or_404(control_no))
+        return render_detail(get_or_404(control_no))
+
+    @app.post("/invoices/<control_no>/export")
+    def export_invoice(control_no):
+        inv = get_or_404(control_no)
+        try:
+            result = eis_export.export(inv, cfg(), repo().conn)
+        except ExportRefused as e:
+            return render_detail(inv, e.issues, status=422)
+        if not result.already_exported:
+            flash(f"e-Invoice JSON exported: {result.path.name}")
+        return redirect(url_for("show_invoice", control_no=control_no))
+
+    @app.get("/invoices/<control_no>/export.json")
+    def download_export(control_no):
+        inv = get_or_404(control_no)
+        done = eis_export.existing_export(repo().conn, cfg(), inv)
+        if done is None or not done.path.exists():
+            abort(404)
+        return send_file(done.path, mimetype="application/json", as_attachment=True,
+                         download_name=done.path.name)
+
+    @app.post("/invoices/<control_no>/test-export")
+    def test_export_invoice(control_no):
+        inv = get_or_404(control_no)
+        try:
+            result = eis_export.export(inv, cfg(), repo().conn, test=True)
+        except ExportRefused as e:
+            return render_detail(inv, e.issues, status=422)
+        return render_template("test_export.html", inv=inv, result=result)
+
+    @app.get("/invoices/<control_no>/test-export.json")
+    def download_test_export(control_no):
+        inv = get_or_404(control_no)
+        result = eis_export.export(inv, cfg(), repo().conn, test=True)
+        return send_file(result.path, mimetype="application/json", as_attachment=True,
+                         download_name=result.path.name)
 
     @app.get("/invoices/<control_no>/pdf")
     def invoice_pdf(control_no):

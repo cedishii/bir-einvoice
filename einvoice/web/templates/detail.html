@@ -20,6 +20,41 @@
 </div>
 
 {% if inv.status == "issued" %}
+<section class="card">
+  <h2>BIR e-invoice (EIS JSON v2.1)</h2>
+  {% if issues %}
+  <div class="flash error">
+    Export refused. Nothing was saved. Problems found:
+    <ul>{% for i in issues %}<li><code>{{ i.code }}</code> {% if i.path %}<strong>{{ i.path }}</strong>: {% endif %}{{ i.message }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+  {% if exported %}
+  <dl>
+    <dt>Status</dt><dd><span class="badge">exported</span></dd>
+    <dt>EisUniqueId</dt><dd><code>{{ exported.eis_unique_id }}</code></dd>
+    <dt>Exported</dt><dd>{{ exported.exported_at.replace("T", " ")[:16] }}</dd>
+    <dt>File</dt><dd><a href="{{ url_for('download_export', control_no=inv.control_no) }}">{{ exported.path.name }}</a></dd>
+  </dl>
+  {% else %}
+  <p class="muted">
+    {% if cfg.is_prototype %}
+      Real export becomes available once BIR issues the EIS Cert Number and PTU
+      (set them in <code>.env</code>). Until then, use the test export to see the JSON.
+    {% else %}
+      Not exported yet. EisUniqueId will be <code>{{ eis_id }}</code>. Each invoice is exported once.
+    {% endif %}
+  </p>
+  <div class="actions left">
+    <form method="post" action="{{ url_for('export_invoice', control_no=inv.control_no) }}">
+      <button type="submit" class="button" {% if cfg.is_prototype %}disabled title="Waiting for BIR-issued values"{% endif %}>Export e-invoice JSON</button>
+    </form>
+    <form method="post" action="{{ url_for('test_export_invoice', control_no=inv.control_no) }}">
+      <button type="submit" class="button secondary">Test export</button>
+    </form>
+  </div>
+  {% endif %}
+</section>
+
 <details class="card danger">
   <summary>Void this invoice</summary>
   <p>Use this when the invoice has a mistake. The invoice stays on file marked VOID, its number is never used again, and you issue a new invoice with the correct details.</p>
