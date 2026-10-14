@@ -1,7 +1,7 @@
 # PLAN — BIR e-Invoice prototype (Micronet Software Manila, Inc.)
 
-Status: **draft, waiting for approval**. No code is written until this is approved
-and the open questions in section 6 are answered.
+Status: **approved 2026-10-14.** Phase 1 built; phase 2 next. Answers to the
+open questions are in section 6.
 
 Main reference: `docs/EIS_SPEC_NOTES.md`. Its "Decisions" section is final.
 
@@ -142,51 +142,33 @@ VAT 0.00, Total. Clearly marked "ZERO-RATED SALE". Layout follows
    tests (including test case 0001773 vs. notes section 5).
 3. Phase 3: not built. Only the `eis/transport/README.md` describing where it plugs in.
 
-## 6. Open questions (please answer before I start)
+## 6. Decisions (answers to the open questions, 2026-10-14)
 
-**Missing files.**
-1. Only `EIS_SPEC_NOTES.md` was on disk (in Downloads; I copied it to `docs/`).
-   `docs/sample-einvoice.json`, `docs/old-receipt.jpg` and `assets/logo.png` are
-   not anywhere on this laptop. The sample JSON was pasted in a different
-   conversation, so I don't have it. Please put all three in the folders.
+1. Files supplied: `docs/sample-einvoice.json`, `docs/old-receipt.jpg`,
+   `docs/reference-invoice-ui.jpg` (a third-party invoice screen, for ideas) and
+   `assets/micronet_logo.pdf`. `assets/logo.png` is rendered from the PDF by
+   `tools/prepare_logo.py`.
+2. **ConvRate keeps the full rate** (up to 6 decimals), on the invoice and in
+   the JSON. Only PHP amounts are rounded to 2 decimals.
+3. Rounding: half up.
+4. Several lines per invoice are supported; the form shows 2 lines by default
+   with "+ Add line". Each line is converted per unit, so the PHP total can differ
+   from (JPY total x rate) by a few centavos; the validator allows for that.
+5. `Nm` (item name) is a form field defaulting to "IT Services"; `Unit` defaults
+   to "LOT", `Qty` to 1.
+6. Business style is printed on the invoice only (the EIS JSON has no field for
+   it; adding one would be an "extra field" schema error, SYN004).
+   JSON `BusinessNm` = client name.
+7. Mistakes: void + reissue with a new number. No credit/debit memos yet.
+8. Control number: 7 digits, starts at `CONTROL_NO_START` (`.env`), never reused.
+   A review step comes before issuing, so a number is only used on confirmation.
+9. Only zero-rated sales (TransClass "02").
+10. Real export is refused while BIR placeholders are set. A "TEST EXPORT"
+    button writes `TEST-*.json` with dummy values (`20TEST00`, `TEST-PTU-NOT-VALID`).
+11. Git repo, pushed to a private GitHub repo, user as sole author.
 
-**Money.**
-2. **ConvRate decimals.** The notes say all Number fields have 2 decimal places, and
-   the draft uses 0.38. But a JPY->PHP rate rounded to 2 decimals is very coarse:
-   on JPY 12,000,000, 0.38 vs 0.384 is a PHP 48,000 difference. Options:
-   (a) the user enters the rate to 2 decimals only, so ConvRate x ForexAmt = PHP exactly;
-   (b) keep the full rate (e.g. 0.3842) in ConvRate and on the invoice, PHP amounts
-   rounded to 2 decimals. Can you check the downloaded official JSON spec for
-   whether ConvRate allows more than 2 decimals? Until then I'd do (b), with the
-   validator accepting up to 6 decimals for ConvRate only.
-3. **Rounding mode:** round half up (0.005 -> 0.01) is my default. OK?
-4. **Several lines on one invoice:** I convert each line JPY -> PHP and add the PHP
-   lines up, so the total can be off by 0.01 from (JPY total x rate). Is
-   one line per invoice enough (as on the paper receipt), or do you need several?
-
-**Fields.**
-5. **Item name (`Nm`, mandatory)** is not in your form list. The draft uses
-   "IT Services". Should it be a form field defaulting to "IT Services", and
-   `Unit` default "LOT", `Qty` 1?
-6. **Business style** has no field in the EIS JSON (`BusinessNm` is a business
-   *name*). I'd print it on the PDF only and set JSON `BusinessNm` = client
-   name, as the draft does. OK?
-7. **Mistakes after saving:** void + reissue with a new number (my proposal), or
-   allow editing? Credit/Debit Memos (DocType 02/03 with CorrYN "Y") are not in
-   phase 1-2 unless you want them.
-8. **Control number:** 7 digits, zero-padded, starting from `CONTROL_NO_START` in
-   `.env` (set to 0001773 for the test case). For real use it would start from the
-   next number after your last paper receipt. Is that right?
-9. **Other sale types:** only zero-rated (TransClass "02") for now? VATable sales
-   would need the 12% VAT math and a different PDF summary.
-
-**Export while BIR placeholders are set.**
-10. The validator refuses export while EIS Cert Number / PTU are placeholders.
-    For the test case I'd use a test-only config in the tests (cert "20TEST00",
-    PTU "TEST-PTU"), never the real `.env`. Do you also want a "TEST EXPORT"
-    button in the app that writes a file clearly named `TEST-…json` with those
-    dummy values?
-
-**Repo.**
-11. Should I `git init` and later push this to GitHub (private?) as you did with
-    your other projects, with you as the only author? Nothing is pushed until you say so.
+Seen on the old receipt (for the record, not used by the app):
+- The client TIN written on it is "433 387 414". Per the business rules the
+  JSON uses "000000000" for Japanese clients; the form's TIN field is for
+  Philippine TINs only.
+- The "TOTAL SALES" box says 17,000,000 while every other amount is 12,000,000.
