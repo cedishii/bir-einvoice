@@ -10,7 +10,7 @@
     <tr>
       <th>No.</th><th>Date</th><th>Client</th>
       <th class="num">Amount (JPY)</th><th class="num">Amount (PHP)</th>
-      <th>Status</th><th></th>
+      <th>Status</th><th>BIR</th><th></th>
     </tr>
   </thead>
   <tbody>
@@ -22,6 +22,7 @@
       <td class="num">{{ fmt(inv.total_jpy) }}</td>
       <td class="num">{{ fmt(inv.total_php) }}</td>
       <td><span class="badge {{ inv.status }}">{{ inv.status }}</span></td>
+      <td>{% if inv.id in eis %}<span class="badge eis-{{ eis[inv.id] | replace(' ', '-') }}">{{ eis[inv.id] if eis[inv.id] != "not sent" else "exported" }}</span>{% else %}<span class="muted">-</span>{% endif %}</td>
       <td><a href="{{ url_for('invoice_pdf', control_no=inv.control_no) }}" target="_blank">PDF</a></td>
     </tr>
   {% endfor %}

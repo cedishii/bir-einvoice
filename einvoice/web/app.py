@@ -14,6 +14,10 @@ from ..models import (DEFAULT_ITEM_NAME, DEFAULT_UNIT, MAX_LEN, FormErrors,
 from ..eis import builder
 from ..eis import export as eis_export
 from ..eis.export import ExportRefused
+from ..eis.transport import results as eis_results
+from ..eis.transport import service as eis_service
+from ..eis.transport.client import EisApiError, EisClient
+from ..eis.transport.settings import TransportSettings, load_transport_settings
 from ..pdf.service_invoice import render as render_pdf
 from ..storage.db import connect
 from ..storage.repository import Repository
@@ -24,9 +28,13 @@ FORM_FIELDS = ["issue_date", "buyer_name", "buyer_tin", "buyer_address",
 DEFAULT_LINES = 2
 
 
-def create_app(config: Config | None = None) -> Flask:
+def create_app(config: Config | None = None, transport: TransportSettings | None = None,
+               http=None) -> Flask:
+    """`transport` / `http` let tests use a fake BIR server."""
     app = Flask(__name__)
     app.config["EINVOICE"] = config or load_config()
+    app.config["EIS_TRANSPORT"] = transport or load_transport_settings()
+    eis_clients: list[EisClient] = []  # one client, so the login session is reused
     app.secret_key = secrets.token_hex(16)
     # Review-page tokens already used to issue an invoice -> control number,
     # so a double click or a browser "resubmit" never issues twice.
@@ -47,9 +55,21 @@ def create_app(config: Config | None = None) -> Flask:
         if conn is not None:
             conn.close()
 
+    def transport() -> TransportSettings:
+        return app.config["EIS_TRANSPORT"]
+
+    def eis_client() -> EisClient:
+        if not eis_clients:
+            eis_clients.append(EisClient(cfg(), transport(), http=http))
+        return eis_clients[0]
+
+    def can_send() -> bool:
+        return not cfg().is_prototype and transport().is_configured
+
     @app.context_processor
     def globals_():
-        return {"cfg": cfg(), "fmt": money.fmt, "fmt_rate": money.fmt_rate,
+        return {"cfg": cfg(), "transport": transport(), "can_send": can_send(),
+                "fmt": money.fmt, "fmt_rate": money.fmt_rate,
                 "fmt_qty": money.fmt_qty,
                 "max_len": MAX_LEN}
 
@@ -64,9 +84,14 @@ def create_app(config: Config | None = None) -> Flask:
         return render_template("form.html", data=data, rows=rows, errors=errors or {},
                                next_no=repo().next_control_no()), status
 
+    def eis_states() -> dict[int, str]:
+        rows = repo().conn.execute("SELECT invoice_id, eis_unique_id FROM eis_exports").fetchall()
+        return {r["invoice_id"]: eis_service.status_of(repo().conn, r["eis_unique_id"]).state
+                for r in rows}
+
     @app.get("/")
     def index():
-        return render_template("list.html", invoices=repo().list(),
+        return render_template("list.html", invoices=repo().list(), eis=eis_states(),
                                next_no=repo().next_control_no())
 
     @app.get("/invoices/new")
@@ -133,7 +158,8 @@ def create_app(config: Config | None = None) -> Flask:
 
     def render_detail(inv, issues=None, status=200):
         exported = eis_export.existing_export(repo().conn, cfg(), inv)
-        return render_template("detail.html", inv=inv, exported=exported,
+        bir = eis_service.status_of(repo().conn, exported.eis_unique_id) if exported else None
+        return render_template("detail.html", inv=inv, exported=exported, bir=bir,
                                issues=issues or [], eis_id=_eis_id(inv)), status
 
     def _eis_id(inv):
@@ -199,6 +225,88 @@ def create_app(config: Config | None = None) -> Flask:
         except ValueError as e:
             flash(str(e), "error")
         return redirect(url_for("show_invoice", control_no=control_no))
+
+    # --- Phase 3: sending to BIR -------------------------------------------
+
+    def bir_action(action, back):
+        if not can_send():
+            flash("Sending to BIR needs the BIR settings in .env (see the BIR page).", "error")
+            return redirect(back)
+        try:
+            message = action()
+            if message:
+                flash(message)
+        except EisApiError as e:
+            flash(f"BIR: {e}", "error")
+        except (ValueError, OSError) as e:
+            flash(str(e), "error")
+        return redirect(back)
+
+    @app.post("/invoices/<control_no>/send")
+    def send_invoice(control_no):
+        inv = get_or_404(control_no)
+        done = eis_export.existing_export(repo().conn, cfg(), inv)
+        back = url_for("show_invoice", control_no=control_no)
+        if done is None:
+            flash("Export the e-invoice JSON first.", "error")
+            return redirect(back)
+
+        def go():
+            [sid] = eis_service.send(repo().conn, cfg(), eis_client(), [done.eis_unique_id])
+            return f"Sent to BIR (submitId {sid}). Use \"Check result\" in a moment."
+        return bir_action(go, back)
+
+    @app.post("/invoices/<control_no>/check")
+    def check_invoice(control_no):
+        inv = get_or_404(control_no)
+        done = eis_export.existing_export(repo().conn, cfg(), inv)
+        back = url_for("show_invoice", control_no=control_no)
+
+        def go():
+            st = eis_service.status_of(repo().conn, done.eis_unique_id)
+            out = eis_service.check_results(repo().conn, eis_client(), [st.submit_id])
+            return f"BIR: {eis_results.PROCESS_CODES.get(out[st.submit_id], out[st.submit_id])}."
+        return bir_action(go, back)
+
+    @app.get("/bir")
+    def bir_page():
+        conn = repo().conn
+        submissions = conn.execute(
+            """SELECT s.*, COUNT(i.eis_unique_id) AS n,
+                      SUM(i.result_code = 'SUC001') AS accepted
+               FROM eis_submissions s LEFT JOIN eis_submission_items i USING (submit_id)
+               GROUP BY s.submit_id ORDER BY s.sent_at DESC LIMIT 50""").fetchall()
+        return render_template("bir.html", pending=eis_service.pending_exports(conn),
+                               open_count=len(eis_service.open_submissions(conn)),
+                               submissions=submissions, describe=eis_results.describe,
+                               process_codes=eis_results.PROCESS_CODES)
+
+    @app.post("/bir/login")
+    def bir_login():
+        def go():
+            session = eis_client().authenticate(force_refresh=True)
+            return f"Logged in to {transport().base_url}. Session valid until {session.expires_at:%Y-%m-%d %H:%M}."
+        return bir_action(go, url_for("bir_page"))
+
+    @app.post("/bir/send-pending")
+    def bir_send_pending():
+        def go():
+            ids = [r["eis_unique_id"] for r in eis_service.pending_exports(repo().conn)]
+            if not ids:
+                return "Nothing to send."
+            sids = eis_service.send(repo().conn, cfg(), eis_client(), ids)
+            return f"Sent {len(ids)} e-invoice(s) in {len(sids)} submission(s)."
+        return bir_action(go, url_for("bir_page"))
+
+    @app.post("/bir/check")
+    def bir_check():
+        def go():
+            out = eis_service.check_results(repo().conn, eis_client())
+            if not out:
+                return "No submissions are waiting for a result."
+            done = sum(1 for v in out.values() if v == eis_results.PROCESS_COMPLETED)
+            return f"Checked {len(out)} submission(s): {done} completed."
+        return bir_action(go, url_for("bir_page"))
 
     @app.get("/logo.png")
     def logo():

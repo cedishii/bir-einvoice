@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}BIR connection{% endblock %}
+{% block content %}
+<div class="heading">
+  <h1>BIR EIS connection</h1>
+  <p class="muted">
+    Server: <code>{{ transport.base_url }}</code>
+    {% if transport.is_sandbox %}<span class="badge">sandbox</span>{% else %}<span class="badge live">LIVE / production</span>{% endif %}
+  </p>
+</div>
+
+<section class="card">
+  <h2>Settings</h2>
+  {% if cfg.placeholders or transport.missing %}
+  <div class="flash error">
+    Not ready to send. Missing in <code>.env</code>:
+    <ul>
+      {% for name in cfg.placeholders %}<li><code>{{ name }}</code> (issued by BIR)</li>{% endfor %}
+      {% for name in transport.missing %}<li><code>{{ name }}</code></li>{% endfor %}
+    </ul>
+    These come from BIR's EIS certification portal after enrollment. See README "Sending to BIR".
+  </div>
+  {% else %}
+  <div class="flash">&check; All settings present.</div>
+  {% endif %}
+  <dl>
+    <dt>Accreditation ID</dt><dd><code>{{ cfg.eis_cert_no }}</code></dd>
+    <dt>Application ID</dt><dd><code>{{ transport.application_id or "-" }}</code></dd>
+    <dt>EIS key ID</dt><dd><code>{{ transport.key_id or "-" }}</code></dd>
+    <dt>RSA padding</dt><dd><code>{{ transport.rsa_padding }}</code> <span class="badge unconfirmed">unconfirmed</span></dd>
+    <dt>Login reply cipher</dt><dd><code>{{ transport.auth_response_cipher }}</code> <span class="badge unconfirmed">unconfirmed</span></dd>
+    <dt>datetime header</dt><dd>UTC{{ "%+d" % transport.datetime_tz_hours }} <span class="badge unconfirmed">unconfirmed</span></dd>
+  </dl>
+  <div class="actions left">
+    <form method="post" action="{{ url_for('bir_login') }}">
+      <button class="button secondary" {% if not can_send %}disabled{% endif %}>Test login</button>
+    </form>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Waiting to be sent ({{ pending | length }})</h2>
+  {% if pending %}
+  <ul>{% for r in pending %}<li><code>{{ r["eis_unique_id"] }}</code> ({{ r["file_name"] }})</li>{% endfor %}</ul>
+  {% else %}<p class="muted">No exported e-invoices are waiting.</p>{% endif %}
+  <div class="actions left">
+    <form method="post" action="{{ url_for('bir_send_pending') }}" onsubmit="this.querySelector('button').disabled = true">
+      <button class="button" {% if not can_send or not pending %}disabled{% endif %}>Send all</button>
+    </form>
+    <form method="post" action="{{ url_for('bir_check') }}">
+      <button class="button secondary" {% if not can_send or not open_count %}disabled{% endif %}>Check results ({{ open_count }} open)</button>
+    </form>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Submissions</h2>
+  {% if submissions %}
+  <table class="grid">
+    <thead><tr><th>Sent</th><th>submitId</th><th>ackId</th><th class="num">Invoices</th><th class="num">Accepted</th><th>Status</th></tr></thead>
+    <tbody>
+    {% for s in submissions %}
+      <tr>
+        <td>{{ s["sent_at"].replace("T", " ")[:16] }}</td>
+        <td><code>{{ s["submit_id"] }}</code></td>
+        <td><code>{{ s["ack_id"] or "-" }}</code></td>
+        <td class="num">{{ s["n"] }}</td>
+        <td class="num">{{ s["accepted"] or 0 }}</td>
+        <td>
+          {% if s["error"] %}<span class="badge void">failed</span> {{ s["error"] }}
+          {% elif s["fail_reason"] %}<span class="badge void">{{ s["fail_reason"] }}</span> {{ describe(s["fail_reason"]) }}
+          {% else %}{{ process_codes.get(s["process_status"], "waiting for result") }}{% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted">Nothing has been sent yet.</p>{% endif %}
+</section>
+{% endblock %}

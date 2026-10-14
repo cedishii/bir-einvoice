@@ -102,3 +102,9 @@ details.danger { border: 1px solid #f2b8c0; }
 
 section.card h2 { margin: 0 0 10px; font-size: 18px; }
 pre.json { background: #1e1e24; color: #e8e8ee; padding: 16px 20px; border-radius: 8px; overflow-x: auto; font-size: 13px; line-height: 1.5; }
+.badge.live { background: #8b0000; color: #fff; }
+.badge.unconfirmed { background: #fff6d6; color: #8a6d00; }
+.badge.eis-exported, .badge.eis-not-sent { background: #eef1f8; color: #34508a; }
+.badge.eis-sent { background: #fff6d6; color: #8a6d00; }
+.badge.eis-accepted { background: #e8f5ec; color: var(--ok); }
+.badge.eis-rejected { background: #fdecee; color: #8b0000; }

@@ -14,6 +14,7 @@
     </a>
     <nav>
       <a href="{{ url_for('index') }}">Invoices</a>
+      <a href="{{ url_for('bir_page') }}">BIR{% if not transport.is_sandbox %} <span class="badge live">LIVE</span>{% endif %}</a>
       <a class="button" href="{{ url_for('new_invoice') }}">+ New invoice</a>
     </nav>
   </header>

@@ -34,7 +34,29 @@
     <dt>EisUniqueId</dt><dd><code>{{ exported.eis_unique_id }}</code></dd>
     <dt>Exported</dt><dd>{{ exported.exported_at.replace("T", " ")[:16] }}</dd>
     <dt>File</dt><dd><a href="{{ url_for('download_export', control_no=inv.control_no) }}">{{ exported.path.name }}</a></dd>
+    <dt>Sent to BIR</dt>
+    <dd>
+      <span class="badge eis-{{ bir.state | replace(' ', '-') }}">{{ bir.state }}</span>
+      {% if bir.result_code %} <code>{{ bir.result_code }}</code> {{ bir.result_text }}{% endif %}
+      {% if bir.error %}<div class="muted">{{ bir.error }}</div>{% endif %}
+    </dd>
+    {% if bir.submit_id %}
+    <dt>Submission</dt><dd><code>{{ bir.submit_id }}</code>{% if bir.ack_id %}, ack <code>{{ bir.ack_id }}</code>{% endif %}<br><span class="muted">{{ bir.sent_at.replace("T", " ")[:16] }}</span></dd>
+    {% endif %}
   </dl>
+  <div class="actions left">
+    {% if bir.state in ("not sent", "rejected") %}
+    <form method="post" action="{{ url_for('send_invoice', control_no=inv.control_no) }}"
+          onsubmit="this.querySelector('button').disabled = true">
+      <button type="submit" class="button" {% if not can_send %}disabled title="BIR settings missing (see the BIR page)"{% endif %}>
+        {{ "Send again" if bir.state == "rejected" else "Send to BIR" }}{% if transport.is_sandbox %} (sandbox){% endif %}</button>
+    </form>
+    {% elif bir.state == "sent" %}
+    <form method="post" action="{{ url_for('check_invoice', control_no=inv.control_no) }}">
+      <button type="submit" class="button" {% if not can_send %}disabled{% endif %}>Check result</button>
+    </form>
+    {% endif %}
+  </div>
   {% else %}
   <p class="muted">
     {% if cfg.is_prototype %}
