@@ -20,7 +20,7 @@ from reportlab.platypus import (Image, KeepTogether, Paragraph, SimpleDocTemplat
 
 from ..config import LOGO_PATH, Config
 from ..models import PH_TZ, Invoice
-from ..money import ZERO, amount_in_words, fmt, fmt_rate
+from ..money import ZERO, amount_in_words, fmt, fmt_qty, fmt_rate
 
 INK = colors.HexColor("#1a1a1a")
 MUTED = colors.HexColor("#555555")
@@ -70,11 +70,6 @@ def _esc(text) -> str:
 
 def _money(v: Decimal) -> str:
     return fmt(v)
-
-
-def _qty(v: Decimal) -> str:
-    """1 -> '1', 1.50 -> '1.5'."""
-    return f"{int(v):,}" if v == v.to_integral_value() else f"{v.normalize():f}"
 
 
 def _header(inv: Invoice, cfg: Config):
@@ -148,7 +143,7 @@ def _lines(inv: Invoice):
         particulars = Paragraph(
             f"<b>{_esc(line.item_name)}</b><br/>{_esc(line.description)}", S_CELL)
         rows.append([
-            _p(i, S_CELL), particulars, _p(_qty(line.qty), _style("q", 8.5, align=TA_RIGHT)),
+            _p(i, S_CELL), particulars, _p(fmt_qty(line.qty), _style("q", 8.5, align=TA_RIGHT)),
             _p(line.unit or "", S_CELL),
             _p(_money(line.unit_cost_jpy), _style("u", 8.5, align=TA_RIGHT)),
             _p(_money(line.amount_jpy), _style("a", 8.5, align=TA_RIGHT)),
