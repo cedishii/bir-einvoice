@@ -15,23 +15,42 @@ a { color: var(--accent-dark); }
 code { background: #eee; padding: 0 4px; border-radius: 3px; }
 main { max-width: 1100px; margin: 0 auto; padding: 20px 16px 60px; }
 
-/* Layout: sidebar on the left, page on the right, New invoice button bottom-right. */
-.layout { display: flex; min-height: 100vh; }
-.sidebar { width: var(--sb-w, 220px); flex: none; background: #141416; color: #ddd; display: flex; flex-direction: column;
-           position: sticky; top: 0; height: 100vh; transition: width .15s ease; }
+/* Layout: the sidebar is fixed on the left and slides out of view; the page
+   (its margin) and the toggle button move with it, same speed and easing. */
+:root { --sb-w: 220px; --sb-ease: cubic-bezier(.4, 0, .2, 1); --sb-time: .3s; }
+.sidebar { position: fixed; top: 0; left: 0; bottom: 0; width: var(--sb-w); z-index: 20;
+           background: #141416; color: #ddd; display: flex; flex-direction: column;
+           box-shadow: 4px 0 18px rgba(0, 0, 0, .18); }
+.content { margin-left: var(--sb-w); min-width: 0; }
+main { padding-bottom: 100px; } /* room for the New invoice button */
+.sb-toggle { position: fixed; top: 10px; left: calc(var(--sb-w) + 10px); z-index: 21;
+             width: 34px; height: 34px; border-radius: 9px; cursor: pointer;
+             display: flex; align-items: center; justify-content: center;
+             font-size: 19px; line-height: 1; padding: 0 0 2px;
+             background: rgba(255, 255, 255, .92); color: #444; border: 1px solid rgba(0, 0, 0, .12);
+             box-shadow: 0 2px 6px rgba(0, 0, 0, .12); }
+.sb-toggle:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+.sb-toggle .when-closed { display: none; }
+.sb-collapsed .sb-toggle .when-open { display: none; }
+.sb-collapsed .sb-toggle .when-closed { display: inline; }
+
+.sb-collapsed .sidebar { transform: translateX(-100%); box-shadow: none; }
+.sb-collapsed .content { margin-left: 0; }
+.sb-collapsed .sb-toggle { left: 10px; }
+/* Only animate when the user toggles (not on page load or while dragging). */
+.sb-animate .sidebar { transition: transform var(--sb-time) var(--sb-ease), box-shadow var(--sb-time); }
+.sb-animate .content { transition: margin-left var(--sb-time) var(--sb-ease); }
+.sb-animate .sb-toggle { transition: left var(--sb-time) var(--sb-ease), background .15s, color .15s; }
+.sb-dragging .sidebar, .sb-dragging .content, .sb-dragging .sb-toggle { transition: none !important; }
 .sb-dragging, .sb-dragging * { cursor: col-resize !important; user-select: none; }
-.sb-dragging .sidebar { transition: none; }
-.sidebar.sb-will-hide { opacity: .5; }
+.sidebar.sb-will-hide { opacity: .45; }
 .sb-handle { position: absolute; top: 0; right: -3px; width: 7px; height: 100%; cursor: col-resize; z-index: 5; }
 .sb-handle:hover { background: rgba(200, 16, 46, .45); }
-.sb-toggle { background: #26262b; color: #ddd; border: 0; border-radius: 6px; width: 30px; height: 30px;
-             font-size: 18px; line-height: 1; cursor: pointer; }
-.sb-toggle:hover { background: var(--accent); color: #fff; }
-.sb-close { position: absolute; top: 12px; right: 12px; z-index: 6; }
-.rail { display: none; width: 44px; flex: none; background: #141416; padding-top: 12px; justify-content: center;
-        position: sticky; top: 0; height: 100vh; }
-.sb-collapsed .sidebar { display: none; }
-.sb-collapsed .rail { display: flex; }
+
+/* Space at the top of the page for the toggle button. */
+.topline { min-height: 54px; padding-left: 54px; display: flex; align-items: stretch; }
+.topline .notice { flex: 1; padding-top: 16px; padding-bottom: 16px; }
+
 .sidebar .brand { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 20px 18px 16px;
                   color: #fff; text-decoration: none; font-weight: 700; font-size: 17px; border-bottom: 1px solid #2a2a2e; }
 .sidebar .brand img { width: 120px; background: #fff; border-radius: 6px; padding: 6px 8px; }
@@ -126,13 +145,8 @@ details.card summary { cursor: pointer; font-weight: 600; }
 details.danger { border: 1px solid #f2b8c0; }
 
 @media (max-width: 760px) {
-  .layout { flex-direction: column; }
-  .sidebar { width: auto; height: auto; position: static; }
-  .sidebar .brand { flex-direction: row; align-items: center; }
-  .sidebar .brand img { width: 80px; }
-  .sidebar nav { flex-direction: row; padding: 0; }
-  .sidebar-foot, .sb-handle, .sb-close, .rail { display: none !important; }
-  .sb-collapsed .sidebar { display: flex; }
+  /* Narrow screens: the sidebar floats over the page instead of pushing it. */
+  .content { margin-left: 0; }
   .row, .row.three, .summary-grid { grid-template-columns: 1fr; }
   table.lines thead { display: none; }
   table.lines tr { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 8px 0; border-bottom: 1px solid var(--line); }
