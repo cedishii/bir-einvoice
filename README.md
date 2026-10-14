@@ -50,7 +50,7 @@ to stop it.
   reports problems with BIR's own result codes (SYN004, ERR002, ERR004 ...).
   Extra local checks: `LOCAL-MATH` (totals), `LOCAL-FX` (JPY × rate = PHP),
   `LOCAL-CONFIG` (BIR values still placeholders).
-- Check any JSON file: `.venv\Scripts\python toolsalidate_json.py FILE.json [--test]`
+- Check any JSON file: `.venv\Scripts\python tools\validate_json.py FILE.json [--test]`
 
 ### How amounts are calculated
 
