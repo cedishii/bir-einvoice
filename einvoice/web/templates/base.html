@@ -33,5 +33,20 @@
     {% endwith %}
     {% block content %}{% endblock %}
   </main>
+  {% if config.DESKTOP %}
+  <script>
+    // Desktop window: tell the app this window is open, and when it closes,
+    // so the program stops once the last window is closed (einvoice/desktop.py).
+    (() => {
+      let id = sessionStorage.getItem("windowId");
+      if (!id) { id = Math.random().toString(36).slice(2); sessionStorage.setItem("windowId", id); }
+      const body = () => { const f = new FormData(); f.append("id", id); return f; };
+      const ping = () => fetch("/_window/ping", {method: "POST", body: body()}).catch(() => {});
+      ping();
+      setInterval(ping, 10000);
+      addEventListener("pagehide", () => navigator.sendBeacon("/_window/bye", body()));
+    })();
+  </script>
+  {% endif %}
 </body>
 </html>
