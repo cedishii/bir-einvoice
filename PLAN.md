@@ -1,6 +1,6 @@
 # PLAN — BIR e-Invoice prototype (Micronet Software Manila, Inc.)
 
-Status: **approved 2026-10-14.** Phase 1 built; phase 2 next. Answers to the
+Status: **approved 2026-10-14.** Phases 1 and 2 built; phase 3 documented only. Answers to the
 open questions are in section 6.
 
 Main reference: `docs/EIS_SPEC_NOTES.md`. Its "Decisions" section is final.
@@ -166,6 +166,16 @@ VAT 0.00, Total. Clearly marked "ZERO-RATED SALE". Layout follows
 10. Real export is refused while BIR placeholders are set. A "TEST EXPORT"
     button writes `TEST-*.json` with dummy values (`20TEST00`, `TEST-PTU-NOT-VALID`).
 11. Git repo, pushed to a private GitHub repo, user as sole author.
+
+Added while building phase 2:
+- An invoice that has been exported can't be voided (BIR expects a correction
+  document with CorrYN "Y"; not built). The review page runs the EIS check, so
+  an invoice that would fail export is never issued.
+- `NetAmtPay` is checked only in the confirmed case (zero-rated, no withholding
+  or other charges: NetAmtPay = TotNetSalesAftDisct). The general formula isn't
+  in the notes, so it isn't guessed.
+- Still to confirm against the official downloaded spec: ConvRate with more than
+  2 decimals (the validator allows up to 6).
 
 Seen on the old receipt (for the record, not used by the app):
 - The client TIN written on it is "433 387 414". Per the business rules the
