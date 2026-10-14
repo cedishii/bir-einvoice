@@ -15,3 +15,6 @@ keys/
 *.pem
 *.key
 *.p12
+
+# Real company documents kept on this computer only
+docs/old-receipt.jpg

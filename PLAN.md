@@ -144,7 +144,8 @@ VAT 0.00, Total. Clearly marked "ZERO-RATED SALE". Layout follows
 
 ## 6. Decisions (answers to the open questions, 2026-10-14)
 
-1. Files supplied: `docs/sample-einvoice.json`, `docs/old-receipt.jpg`,
+1. Files supplied: `docs/sample-einvoice.json`, `docs/old-receipt.jpg` (kept
+   locally only, gitignored: it is a real signed receipt),
    `docs/reference-invoice-ui.jpg` (a third-party invoice screen, for ideas) and
    `assets/micronet_logo.pdf`. `assets/logo.png` is rendered from the PDF by
    `tools/prepare_logo.py`.
