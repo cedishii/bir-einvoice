@@ -81,6 +81,15 @@ class Repository:
         reason = " ".join(reason.split())
         if not reason:
             raise ValueError("A reason is required to void an invoice.")
+        exported = self.conn.execute(
+            """SELECT 1 FROM eis_exports e JOIN invoices i ON i.id = e.invoice_id
+               WHERE i.control_no = ?""", (control_no,)).fetchone()
+        if exported:
+            # Once an e-invoice exists, BIR expects a correction document
+            # (CorrYN "Y", e.g. CorrectionCd 04 Cancellation), not a silent void.
+            raise ValueError(f"Invoice {control_no} has already been exported to EIS "
+                             "JSON and can't simply be voided. Corrections (credit "
+                             "memos / cancellations) are not built yet.")
         cur = self.conn.execute(
             """UPDATE invoices SET status = 'void', void_reason = ?, voided_at = ?
                WHERE control_no = ? AND status = 'issued'""",

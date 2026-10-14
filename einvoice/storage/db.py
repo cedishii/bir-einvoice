@@ -49,6 +49,16 @@ MIGRATIONS = [
         last_no  INTEGER NOT NULL
     );
     """,
+    # 2: real EIS exports. EisUniqueId is unique, so it can never be reused (SYN003).
+    """
+    CREATE TABLE eis_exports (
+        eis_unique_id  TEXT PRIMARY KEY,
+        invoice_id     INTEGER NOT NULL UNIQUE REFERENCES invoices(id),
+        exported_at    TEXT NOT NULL,
+        file_name      TEXT NOT NULL,
+        sha256         TEXT NOT NULL
+    );
+    """,
 ]
 
 
