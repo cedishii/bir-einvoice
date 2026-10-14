@@ -154,7 +154,8 @@ def open_window(url: str, profile_dir: Path) -> subprocess.Popen | None:
     profile_dir.mkdir(parents=True, exist_ok=True)
     return subprocess.Popen([
         browser, f"--app={url}", f"--user-data-dir={profile_dir}",
-        f"--window-size={WINDOW_SIZE}", "--no-first-run", "--no-default-browser-check",
+        f"--window-size={WINDOW_SIZE}", "--start-maximized",
+        "--no-first-run", "--no-default-browser-check",
         # Browser extensions (e.g. writing assistants) have no business reading
         # invoice data, and they open their own welcome pages in a new profile.
         "--disable-extensions",
@@ -220,8 +221,9 @@ def native_window(url: str) -> None:
 
     webview.settings["ALLOW_DOWNLOADS"] = True                   # Download PDF / JSON
     webview.settings["OPEN_EXTERNAL_LINKS_IN_BROWSER"] = False
+    # Opens maximized to fit the screen; the size is used when un-maximized.
     window = webview.create_window(APP_TITLE, url, width=1320, height=880, min_size=(900, 600),
-                                   js_api=WindowApi())
+                                   maximized=True, js_api=WindowApi())
     window.events.shown += lambda: _set_icon(window)
     webview.start(gui="edgechromium", private_mode=False,
                   storage_path=str(load_config().data_dir / "webview"))
