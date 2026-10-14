@@ -5,11 +5,24 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Service Invoices{% endblock %} · Micronet e-Invoice</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script>
+    // Restore the sidebar's width / collapsed state before the page paints.
+    try {
+      if (localStorage.getItem("sidebar") === "collapsed") document.documentElement.classList.add("sb-collapsed");
+      const w = parseInt(localStorage.getItem("sidebarWidth"), 10);
+      if (w) document.documentElement.style.setProperty("--sb-w", w + "px");
+    } catch (e) {}
+  </script>
 </head>
 <body>
 {% set ep = request.endpoint or "" %}
 <div class="layout">
-  <aside class="sidebar">
+  <div class="rail">
+    <button type="button" class="sb-toggle" id="sb-open" title="Show menu">&raquo;</button>
+  </div>
+  <aside class="sidebar" id="sidebar">
+    <button type="button" class="sb-toggle sb-close" id="sb-close" title="Hide menu">&laquo;</button>
+    <div class="sb-handle" id="sb-handle" title="Drag to resize; drag far left to hide"></div>
     <a class="brand" href="{{ url_for('index') }}">
       <img src="{{ url_for('logo') }}" alt="Micronet Software Manila, Inc.">
       <span>e-Invoice <small>BIR EIS v2.1</small></span>
@@ -49,6 +62,48 @@
   </main>
   </div>
 </div>
+
+<script>
+  // Sidebar: hide with « / show with », or drag its right edge (narrow
+  // enough and it hides). Remembered per computer (browser storage).
+  (() => {
+    const root = document.documentElement, side = document.getElementById("sidebar");
+    const MIN = 170, MAX = 360, HIDE_BELOW = 120;
+    const save = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+    const collapse = (yes) => { root.classList.toggle("sb-collapsed", yes); save("sidebar", yes ? "collapsed" : "open"); };
+    document.getElementById("sb-close").onclick = () => collapse(true);
+    document.getElementById("sb-open").onclick = () => collapse(false);
+
+    const handle = document.getElementById("sb-handle");
+    handle.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      handle.setPointerCapture(e.pointerId);
+      const left = side.getBoundingClientRect().left;
+      const start = side.getBoundingClientRect().width;
+      root.classList.add("sb-dragging");
+      const move = (ev) => {
+        const w = Math.min(MAX, ev.clientX - left);
+        side.style.width = Math.max(w, 40) + "px";
+        side.classList.toggle("sb-will-hide", w < HIDE_BELOW);
+      };
+      const up = (ev) => {
+        handle.removeEventListener("pointermove", move);
+        handle.removeEventListener("pointerup", up);
+        root.classList.remove("sb-dragging");
+        side.classList.remove("sb-will-hide");
+        side.style.width = "";
+        const w = Math.min(MAX, ev.clientX - left);
+        if (w < HIDE_BELOW) { collapse(true); return; }
+        const width = Math.max(MIN, w);
+        root.style.setProperty("--sb-w", width + "px");
+        save("sidebarWidth", String(width));
+      };
+      handle.addEventListener("pointermove", move);
+      handle.addEventListener("pointerup", up);
+    });
+    handle.addEventListener("dblclick", () => collapse(true));
+  })();
+</script>
 
 {% if ep not in ('new_invoice', 'review_invoice', 'edit_invoice', 'issue_invoice') %}
 <a class="fab" href="{{ url_for('new_invoice') }}" title="New invoice">
