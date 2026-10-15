@@ -69,7 +69,7 @@
       <thead>
         <tr>
           <th>Item name <em>*</em></th><th class="wide">Description <em>*</em></th>
-          <th>Qty</th><th>Unit</th><th>Unit price (JPY)</th><th></th>
+          <th>Qty</th><th>Unit</th><th>Unit price (JPY)</th><th>Amount (JPY) <em>*</em></th><th></th>
         </tr>
       </thead>
       <tbody>
@@ -82,15 +82,20 @@
           <td><input name="unit[]" value="{{ row[3] }}" maxlength="50" class="short"></td>
           <td><input name="unit_cost_jpy[]" value="{{ row[4] }}" inputmode="decimal"
                      class="num" placeholder="0"></td>
+          <td><input name="amount_jpy[]" value="{{ row[5] }}" inputmode="decimal"
+                     class="num" placeholder="0" title="Qty x unit price, or type the amount"></td>
           <td><button type="button" class="link remove" title="Remove line">&times;</button></td>
         </tr>
       {% endfor %}
       </tbody>
+      <tfoot><tr><td colspan="5" class="num"><strong>Total (JPY, before VAT)</strong></td>
+        <td class="num"><strong id="lines-total">0.00</strong></td><td></td></tr></tfoot>
     </table>
     <button type="button" class="link" id="add-line">+ Add line</button>
-    <small class="muted block">Qty, unit and unit price can be left blank. A blank qty counts as 1 and prints blank.
-      A line with no unit price is a note line: its description prints on the invoice, without an amount.
-      At least one line needs a unit price. Blank lines are ignored.</small>
+    <small class="muted block">Two ways to give a line its amount: fill in the unit price (and qty) and the amount
+      is worked out, or leave the unit price blank and type the amount yourself. Qty and unit may be blank;
+      a blank qty counts as 1. A line with no amount is a note line: its description prints on the invoice
+      without an amount. Blank lines are ignored.</small>
   </fieldset>
 
   <fieldset>
@@ -130,8 +135,11 @@
     row.classList.remove("has-error");
     row.querySelector('[name="description[]"]').value = "";
     row.querySelector('[name="unit_cost_jpy[]"]').value = "";
+    row.querySelector('[name="amount_jpy[]"]').value = "";
+    row.querySelector('[name="amount_jpy[]"]').classList.remove("computed");
     row.querySelector('[name="qty[]"]').value = "1";
     tbody.appendChild(row);
+    totals();
     row.querySelector('[name="description[]"]').focus();
   });
   tbody.addEventListener("click", (e) => {
@@ -140,6 +148,44 @@
     else e.target.closest("tr").querySelectorAll("input").forEach(i => {
       if (i.name !== "item_name[]" && i.name !== "unit[]") i.value = i.name === "qty[]" ? "1" : "";
     });
+    totals();
   });
+
+  // Amount: qty x unit price when there is a unit price (shown greyed);
+  // otherwise typed by hand. Typing an amount clears the unit price.
+  const num = (v) => parseFloat((v || "").replace(/,/g, ""));
+  const money = (n) => n.toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  function fill(row) {
+    const price = num(row.querySelector('[name="unit_cost_jpy[]"]').value);
+    const qtyText = row.querySelector('[name="qty[]"]').value.trim();
+    const qty = qtyText === "" ? 1 : num(qtyText);
+    const amount = row.querySelector('[name="amount_jpy[]"]');
+    if (!isNaN(price)) {
+      amount.value = isNaN(qty) ? "" : money(Math.round(qty * price * 100) / 100);
+      amount.classList.add("computed");
+    } else if (amount.classList.contains("computed")) {
+      amount.value = "";
+      amount.classList.remove("computed");
+    }
+  }
+  function totals() {
+    let sum = 0;
+    tbody.querySelectorAll('[name="amount_jpy[]"]').forEach(a => { const v = num(a.value); if (!isNaN(v)) sum += v; });
+    document.getElementById("lines-total").textContent = money(sum);
+  }
+  tbody.addEventListener("input", (e) => {
+    const row = e.target.closest("tr");
+    if (e.target.name === "amount_jpy[]") {
+      e.target.classList.remove("computed");
+      row.querySelector('[name="unit_cost_jpy[]"]').value = "";
+    } else if (e.target.name === "unit_cost_jpy[]" || e.target.name === "qty[]") {
+      fill(row);
+    }
+    totals();
+  });
+  tbody.querySelectorAll("tr").forEach(row => {
+    if (row.querySelector('[name="unit_cost_jpy[]"]').value.trim()) fill(row);
+  });
+  totals();
 </script>
 {% endblock %}

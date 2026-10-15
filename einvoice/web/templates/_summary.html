@@ -32,9 +32,9 @@
       <td><strong>{{ line.item_name }}</strong><br>{{ line.description }}</td>
       <td class="num">{{ fmt_qty(line.qty) if line.qty is not none else "" }}</td>
       <td>{{ line.unit }}</td>
-      <td class="num">{{ fmt(line.unit_cost_jpy) }}</td>
+      <td class="num">{{ fmt(line.unit_cost_jpy) if line.unit_cost_jpy is not none else "" }}</td>
       <td class="num">{{ fmt(line.amount_jpy) }}</td>
-      <td class="num">{{ fmt(line.unit_cost_php) }}</td>
+      <td class="num">{{ fmt(line.unit_cost_php) if line.unit_cost_jpy is not none else "" }}</td>
       <td class="num">{{ fmt(line.sales_php) }}</td>
     </tr>
     {% endif %}

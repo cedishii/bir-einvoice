@@ -154,7 +154,8 @@ def _lines(inv: Invoice):
         rows.append([
             _p(n, S_CELL), particulars, _p(qty, _style("q", 8.5, align=TA_RIGHT)),
             _p(line.unit or "", S_CELL),
-            _p(_money(line.unit_cost_jpy), _style("u", 8.5, align=TA_RIGHT)),
+            _p(_money(line.unit_cost_jpy) if line.unit_cost_jpy is not None else "",
+               _style("u", 8.5, align=TA_RIGHT)),
             _p(_money(line.amount_jpy), _style("a", 8.5, align=TA_RIGHT)),
             _p(_money(line.sales_php), _style("p", 8.5, align=TA_RIGHT)),
         ])

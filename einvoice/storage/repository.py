@@ -143,6 +143,9 @@ def _invoice_from_rows(row: sqlite3.Row, line_rows: list[sqlite3.Row]) -> Invoic
             item_name=l["item_name"], description=l["description"],
             qty=Decimal(l["qty"]) if l["qty"] else None, unit=l["unit"],
             unit_cost_jpy=Decimal(l["unit_cost_jpy"]) if l["unit_cost_jpy"] else None,
+            # No unit price but an amount: the amount was typed directly.
+            amount_entered=(Decimal(l["amount_jpy"])
+                            if not l["unit_cost_jpy"] and Decimal(l["amount_jpy"]) else None),
             amount_jpy=Decimal(l["amount_jpy"]),
             unit_cost_php=Decimal(l["unit_cost_php"]),
             sales_php=Decimal(l["sales_php"]),

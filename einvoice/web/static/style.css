@@ -258,3 +258,4 @@ body.bare { display: flex; align-items: center; justify-content: center; min-hei
 .back-btn { align-self: center; margin-right: 12px; flex: none; border: 1px solid rgba(0, 0, 0, .12); background: #fff;
             border-radius: 8px; padding: 6px 12px; font: inherit; font-size: 14px; color: #444; cursor: pointer; }
 .back-btn:hover { border-color: var(--accent); color: var(--accent-dark); }
+input.num.computed { background: #f3f3f5; color: #555; }

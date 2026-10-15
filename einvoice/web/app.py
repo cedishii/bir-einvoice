@@ -4,6 +4,7 @@ from __future__ import annotations
 import re
 import secrets
 from datetime import date
+from itertools import zip_longest
 
 from flask import (Flask, Response, abort, flash, g, redirect, render_template,
                    request, send_file, url_for)
@@ -26,7 +27,7 @@ from ..storage.db import connect
 from ..storage.repository import Repository
 from . import auth_views, books
 
-LINE_FIELDS = ["item_name", "description", "qty", "unit", "unit_cost_jpy"]
+LINE_FIELDS = ["item_name", "description", "qty", "unit", "unit_cost_jpy", "amount_jpy"]
 FORM_FIELDS = ["issue_date", "buyer_name", "buyer_tin", "buyer_address",
                "business_style", "buyer_email", "trans_class", "rate", "rate_date",
                "rate_source"]
@@ -116,7 +117,7 @@ def create_app(config: Config | None = None, transport: TransportSettings | None
         return data
 
     def render_form(data: dict, errors: dict | None = None, status=200, draft_id: str = ""):
-        rows = list(zip(*(data[k + "[]"] for k in LINE_FIELDS)))
+        rows = list(zip_longest(*(data[k + "[]"] for k in LINE_FIELDS), fillvalue=""))
         return render_template("form.html", data=data, rows=rows, errors=errors or {},
                                next_no=repo().next_control_no(),
                                draft_id=draft_id or secrets.token_hex(16)), status
@@ -162,7 +163,7 @@ def create_app(config: Config | None = None, transport: TransportSettings | None
                 "buyer_email": src.buyer_email,
                 "rate_source": src.rate_source,  # the source, never the rate itself
             }
-        blank = [DEFAULT_ITEM_NAME, "", "1", DEFAULT_UNIT, ""]
+        blank = [DEFAULT_ITEM_NAME, "", "1", DEFAULT_UNIT, "", ""]
         for i, k in enumerate(LINE_FIELDS):
             data[k + "[]"] = [blank[i]] * DEFAULT_LINES
         return render_form(data)
@@ -190,7 +191,7 @@ def create_app(config: Config | None = None, transport: TransportSettings | None
         next_no = repo().next_control_no()
         problems = eis_export.precheck(inv, cfg(), next_no)
         return render_template("review.html", inv=inv, data=data, rows=list(
-            zip(*(data[k + "[]"] for k in LINE_FIELDS))), token=draft,
+            zip_longest(*(data[k + "[]"] for k in LINE_FIELDS), fillvalue="")), token=draft,
             next_no=next_no, problems=problems, issued_as=issued_tokens.get(draft))
 
     @app.post("/invoices/issue")

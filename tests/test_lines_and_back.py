@@ -64,3 +64,41 @@ def test_review_has_its_own_address_and_back_keeps_the_form(client):
 def test_every_page_has_a_back_button(client):
     for url in ("/", "/books", "/invoices/new", "/collections"):
         assert 'id="back-btn"' in client.get(url).get_data(as_text=True), url
+
+
+def amount_lines(*rows):
+    """rows of (description, qty, unit, unit price, amount)."""
+    return {
+        "item_name[]": ["IT Services"] * len(rows),
+        "description[]": [r[0] for r in rows], "qty[]": [r[1] for r in rows],
+        "unit[]": [r[2] for r in rows], "unit_cost_jpy[]": [r[3] for r in rows],
+        "amount_jpy[]": [r[4] for r in rows]}
+
+
+def test_amount_typed_directly_or_computed(repo, config):
+    data = form() | amount_lines(("Rendered for September 2026", "", "", "", "12,000,000"),
+                                 ("Support", "2", "MONTH", "150000", "300,000.00"))
+    inv = repo.issue(invoice_from_form(data))
+    saved = repo.get(inv.control_no)
+    typed, computed = saved.lines
+    assert typed.unit_cost_jpy is None and typed.amount_entered == D("12000000")
+    assert typed.amount_jpy == D("12000000.00") and typed.sales_php == D("4560000.00")
+    assert computed.amount_entered is None and computed.amount_jpy == D("300000.00")
+    assert saved.total_jpy == D("12300000.00")
+    items = builder.build(saved, config.with_(eis_cert_no="20TEST00", ptu_num="X"))["ItemList"]
+    assert [i["UnitCost"].text for i in items] == ["4560000.00", "57000.00"]
+    assert render(saved, config).startswith(b"%PDF")
+
+
+def test_amount_checks():
+    with pytest.raises(FormErrors, match="not qty x unit price"):
+        invoice_from_form(form() | amount_lines(("x", "2", "", "100", "250")))
+    with pytest.raises(FormErrors, match="divide evenly"):
+        invoice_from_form(form() | amount_lines(("x", "3", "", "", "100")))
+    ok = invoice_from_form(form() | amount_lines(("x", "4", "", "", "100")))
+    assert ok.lines[0].billed_unit_cost_jpy == D("25") and ok.total_jpy == D("100.00")
+
+
+def test_form_has_amount_column_and_total(client):
+    page = client.get("/invoices/new").get_data(as_text=True)
+    assert page.count('<input name="amount_jpy[]"') == 2 and 'id="lines-total"' in page
