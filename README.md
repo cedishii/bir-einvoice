@@ -1,7 +1,7 @@
 # Micronet e-Invoice (BIR EIS prototype)
 
-A small local app for **Micronet Software Manila, Inc.** It issues zero-rated
-**Service Invoices** to clients in Japan, billed in JPY with the PHP equivalent,
+A small local app for **Micronet Software Manila, Inc.** It issues VATable,
+zero-rated or VAT-exempt **Service Invoices**, mainly to clients in Japan, billed in JPY with the PHP equivalent,
 prints them as PDF, and exports each one as an e-invoice in BIR's Electronic
 Invoicing System (EIS) JSON format v2.1, checked by a built-in validator.
 
@@ -112,7 +112,10 @@ Some protocol details are marked *unconfirmed* on the BIR page. See
 - PHP line amount = quantity × PHP unit price. Totals are the sum of the lines.
 - The rate is kept exactly as entered (up to 6 decimals). It is not printed on
   the invoice or in the e-mail; it is sent to BIR as `ForCur.ConvRate`.
-- VAT is always 0.00 (zero-rated export of services).
+- The sale type is picked on each invoice: **VATable (12%)**, **VAT Zero-Rated
+  (0%)** or **VAT-Exempt**. Prices are entered net of VAT; for VATable sales 12%
+  VAT is added on top of the total (in JPY for the client, in PHP for BIR).
+  Zero-rated and exempt invoices have VAT 0.00.
 
 ## Settings (`.env`)
 

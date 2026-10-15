@@ -95,6 +95,10 @@ MIGRATIONS = [
         automatic   INTEGER NOT NULL DEFAULT 0
     );
     """,
+    # 5: sale type (EIS TransClass). Invoices before this were all zero-rated.
+    """
+    ALTER TABLE invoices ADD COLUMN trans_class TEXT NOT NULL DEFAULT '02';
+    """,
 ]
 
 

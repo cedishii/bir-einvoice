@@ -1,0 +1,2 @@
+{# Sale type badge. Expects `inv`. #}
+<span class="badge {{ {"01": "vat", "02": "zr", "03": "ex"}.get(inv.trans_class, "") }}">{{ inv.sale_type }}</span>

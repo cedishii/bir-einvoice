@@ -28,6 +28,16 @@ MAX_LEN = {
     "rate_source": 200,     # stored and printed only
 }
 
+# Sale types the user picks from (EIS TransClass codes, docs/EIS_SPEC_NOTES.md
+# section 1). 04 is for Registered Business Enterprises only, which Micronet
+# is not, so it is never offered.
+VATABLE, ZERO_RATED, VAT_EXEMPT = "01", "02", "03"
+SALE_TYPES = {
+    VATABLE: "VATable (12%)",
+    ZERO_RATED: "VAT Zero-Rated (0%)",
+    VAT_EXEMPT: "VAT-Exempt",
+}
+
 DEFAULT_ITEM_NAME = "IT Services"
 DEFAULT_UNIT = "LOT"
 NO_TIN = "000000000"     # buyer not registered with BIR
@@ -65,6 +75,7 @@ class Invoice:
     rate_source: str
     lines: list[InvoiceLine]
     buyer_email: str = ""     # where the invoice PDF is e-mailed; BuyerInfo.Email
+    trans_class: str = ZERO_RATED  # sale type, a SALE_TYPES key; EIS TransClass
     control_no: str = ""      # assigned when the invoice is issued
     status: str = "draft"     # draft / issued / void
     eis_key: str = ""         # last 8 chars of the EisUniqueId, fixed at issue
@@ -86,6 +97,32 @@ class Invoice:
         self.total_jpy = sum((l.amount_jpy for l in self.lines), money.ZERO)
         self.total_php = sum((l.sales_php for l in self.lines), money.ZERO)
         return self
+
+    @property
+    def is_vatable(self) -> bool:
+        return self.trans_class == VATABLE
+
+    @property
+    def sale_type(self) -> str:
+        return SALE_TYPES.get(self.trans_class, self.trans_class)
+
+    # Line amounts are net of VAT. VATable sales add 12% on top, worked out on
+    # the invoice total (PHP for BIR, JPY for what the client pays).
+    @property
+    def vat_php(self) -> Decimal:
+        return money.vat_of(self.total_php) if self.is_vatable else money.ZERO
+
+    @property
+    def vat_jpy(self) -> Decimal:
+        return money.vat_of(self.total_jpy) if self.is_vatable else money.ZERO
+
+    @property
+    def total_due_php(self) -> Decimal:
+        return self.total_php + self.vat_php
+
+    @property
+    def total_due_jpy(self) -> Decimal:
+        return self.total_jpy + self.vat_jpy
 
     @property
     def has_tin(self) -> bool:
@@ -165,6 +202,9 @@ def invoice_from_form(form: dict) -> Invoice:
     buyer_email = _text(form, "buyer_email", "Client e-mail", errors, required=False)
     if buyer_email and "buyer_email" not in errors and not is_email(buyer_email):
         errors["buyer_email"] = "Client e-mail is not a valid address (one address only)."
+    trans_class = str(form.get("trans_class", "")).strip()
+    if trans_class not in SALE_TYPES:
+        errors["trans_class"] = "Choose the sale type (VATable, zero-rated or VAT-exempt)."
     rate_source = _text(form, "rate_source", "Rate source", errors)
     rate_date = _parse_date(form.get("rate_date"), "Rate date", errors, "rate_date")
 
@@ -224,7 +264,7 @@ def invoice_from_form(form: dict) -> Invoice:
     return Invoice(
         issue_date=issue_date, buyer_name=buyer_name, buyer_tin=buyer_tin,
         buyer_branch=buyer_branch, buyer_address=buyer_address,
-        business_style=business_style, buyer_email=buyer_email,
+        business_style=business_style, buyer_email=buyer_email, trans_class=trans_class,
         rate=rate, rate_date=rate_date,
         rate_source=rate_source, lines=lines,
     ).compute()

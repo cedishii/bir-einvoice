@@ -12,7 +12,7 @@
     <dt>Exchange rate</dt><dd>PHP {{ fmt_rate(inv.rate) }} per JPY 1</dd>
     <dt>Rate date</dt><dd>{{ inv.rate_date | longdate }}</dd>
     <dt>Rate source</dt><dd>{{ inv.rate_source }}</dd>
-    <dt>Sale type</dt><dd><span class="badge zr">Zero-rated sale</span></dd>
+    <dt>Sale type</dt><dd>{% include "_sale_type.html" %}</dd>
   </dl>
 </div>
 
@@ -43,9 +43,13 @@
 </table>
 
 <table class="sales-box">
-  <tr><td>VATable Sales</td><td class="num">0.00</td></tr>
-  <tr><td>VAT-Exempt Sales</td><td class="num">0.00</td></tr>
-  <tr class="zr"><td>Zero-Rated Sales</td><td class="num">{{ fmt(inv.total_php) }}</td></tr>
-  <tr><td>VAT Amount</td><td class="num">0.00</td></tr>
-  <tr class="total"><td>Total Amount Due (PHP)</td><td class="num">{{ fmt(inv.total_php) }}</td></tr>
+  {% for code, label in [("01", "VATable Sales"), ("03", "VAT-Exempt Sales"), ("02", "Zero-Rated Sales")] %}
+  <tr class="{{ 'zr' if inv.trans_class == code }}"><td>{{ label }}</td>
+      <td class="num">{{ fmt(inv.total_php) if inv.trans_class == code else "0.00" }}</td></tr>
+  {% endfor %}
+  <tr><td>VAT Amount (12%)</td><td class="num">{{ fmt(inv.vat_php) }}</td></tr>
+  {% if inv.is_vatable %}
+  <tr><td>Total Amount Due (JPY)</td><td class="num">{{ fmt(inv.total_due_jpy) }}</td></tr>
+  {% endif %}
+  <tr class="total"><td>Total Amount Due (PHP)</td><td class="num">{{ fmt(inv.total_due_php) }}</td></tr>
 </table>

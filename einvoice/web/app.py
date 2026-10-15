@@ -9,7 +9,7 @@ from flask import (Flask, Response, abort, flash, g, redirect, render_template,
 
 from .. import emailer, money
 from ..config import LOGO_PATH, Config, load_config
-from ..models import (DEFAULT_ITEM_NAME, DEFAULT_UNIT, MAX_LEN, FormErrors,
+from ..models import (DEFAULT_ITEM_NAME, DEFAULT_UNIT, MAX_LEN, SALE_TYPES, FormErrors,
                       invoice_from_form, today_ph)
 from ..eis import builder
 from ..eis import export as eis_export
@@ -24,7 +24,8 @@ from ..storage.repository import Repository
 
 LINE_FIELDS = ["item_name", "description", "qty", "unit", "unit_cost_jpy"]
 FORM_FIELDS = ["issue_date", "buyer_name", "buyer_tin", "buyer_address",
-               "business_style", "buyer_email", "rate", "rate_date", "rate_source"]
+               "business_style", "buyer_email", "trans_class", "rate", "rate_date",
+               "rate_source"]
 DEFAULT_LINES = 2
 
 
@@ -86,7 +87,7 @@ def create_app(config: Config | None = None, transport: TransportSettings | None
                 "email": email_settings(),
                 "fmt": money.fmt, "fmt_rate": money.fmt_rate,
                 "fmt_qty": money.fmt_qty,
-                "max_len": MAX_LEN}
+                "max_len": MAX_LEN, "sale_types": SALE_TYPES}
 
     def form_data() -> dict:
         data = {k: request.form.get(k, "") for k in FORM_FIELDS}

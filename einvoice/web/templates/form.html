@@ -28,10 +28,17 @@
     <legend>Invoice</legend>
     <div class="row">
       {{ field("issue_date", "Invoice date", "date") }}
-      <div class="field static">
-        <span>Sale type</span>
-        <div><span class="badge zr">Zero-rated sale</span> Export of services, VAT 0.00</div>
-      </div>
+      <label class="field {{ 'has-error' if errors.get('trans_class') }}">
+        <span>Sale type <em>*</em></span>
+        <select name="trans_class" required>
+          <option value="" {{ 'selected' if not data.trans_class }} disabled>Choose the sale type</option>
+          {% for code, label in sale_types.items() %}
+          <option value="{{ code }}" {{ 'selected' if data.trans_class == code }}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        <small>VATable adds 12% VAT on top of the prices below. Zero-rated (e.g. services
+          to clients abroad) and VAT-exempt have no VAT.</small>
+      </label>
     </div>
   </fieldset>
 

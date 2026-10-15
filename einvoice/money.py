@@ -15,6 +15,7 @@ ZERO = Decimal("0.00")
 RATE_MAX_DECIMALS = 6
 AMOUNT_MAX_DECIMALS = 2
 QTY_MAX_DECIMALS = 2
+VAT_RATE = Decimal("0.12")  # VATable sales: 12% added on top of the net amount
 
 
 class MoneyError(ValueError):
@@ -66,6 +67,11 @@ def parse_qty(text) -> Decimal:
 
 def to_php(jpy: Decimal, rate: Decimal) -> Decimal:
     return round2(jpy * rate)
+
+
+def vat_of(net: Decimal) -> Decimal:
+    """12% VAT on a net-of-VAT amount, rounded to 2 decimals."""
+    return round2(net * VAT_RATE)
 
 
 def line_amounts(qty: Decimal, unit_cost_jpy: Decimal, rate: Decimal) -> dict:

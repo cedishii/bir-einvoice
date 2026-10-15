@@ -163,7 +163,7 @@ VAT 0.00, Total. Clearly marked "ZERO-RATED SALE". Layout follows
 7. Mistakes: void + reissue with a new number. No credit/debit memos yet.
 8. Control number: 7 digits, starts at `CONTROL_NO_START` (`.env`), never reused.
    A review step comes before issuing, so a number is only used on confirmation.
-9. Only zero-rated sales (TransClass "02").
+9. ~~Only zero-rated sales (TransClass "02").~~ Changed 2026-10-15, see below.
 10. Real export is refused while BIR placeholders are set. A "TEST EXPORT"
     button writes `TEST-*.json` with dummy values (`20TEST00`, `TEST-PTU-NOT-VALID`).
 11. Git repo, pushed to a private GitHub repo, user as sole author.
@@ -181,6 +181,12 @@ Added while building phase 2:
   data and the draft in docs/EIS_SPEC_NOTES.md section 5 updated.
 - Client TIN can be typed for Philippine clients; blank = foreign client
   (N/A on the invoice, 000000000 to BIR).
+- 2026-10-15, user: the sale type is a required dropdown with no default:
+  VATable (12%) = TransClass "01", VAT Zero-Rated (0%) = "02", VAT-Exempt = "03"
+  ("04" is RBE-only and never offered). Prices entered are net of VAT; VATable
+  adds 12% on top, computed on the invoice total (VATAmt = 12% of
+  TotNetSalesAftDisct, NetAmtPay = net + VAT; ForCur.ForexAmt = the JPY total
+  due incl. VAT). Invoices issued before this are zero-rated (migration 5).
 - Still to confirm against the official downloaded spec: ConvRate with more than
   2 decimals (the validator allows up to 6).
 

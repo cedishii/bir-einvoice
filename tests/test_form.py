@@ -13,6 +13,7 @@ def form(**overrides):
         "buyer_tin": "",
         "buyer_address": "SAPPORO, JAPAN",
         "business_style": "Graphic Design",
+        "trans_class": "02",
         "rate": "0.38",
         "rate_date": "2024-11-25",
         "rate_source": "Example rate",

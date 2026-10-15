@@ -134,9 +134,9 @@ legend { font-weight: 700; font-size: 13px; text-transform: uppercase; letter-sp
 .field em, th em { color: var(--accent); font-style: normal; }
 .field small { color: var(--muted); font-size: 12px; }
 .field.static div { padding: 8px 0; }
-input { font: inherit; padding: 8px 10px; border: 1px solid #c4c4cc; border-radius: 6px; width: 100%; background: #fff; }
-input:focus { outline: 2px solid #f3a3b0; border-color: var(--accent); }
-.has-error input { border-color: var(--accent); background: #fff5f6; }
+input, select { font: inherit; padding: 8px 10px; border: 1px solid #c4c4cc; border-radius: 6px; width: 100%; background: #fff; }
+input:focus, select:focus { outline: 2px solid #f3a3b0; border-color: var(--accent); }
+.has-error input, .has-error select { border-color: var(--accent); background: #fff5f6; }
 input.num, td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 input.short { width: 80px; }
 
@@ -166,6 +166,8 @@ tr.void td:last-child, tr.void td:nth-last-child(2) { text-decoration: none; }
          background: #e8f5ec; color: var(--ok); text-transform: uppercase; vertical-align: middle; }
 .badge.void { background: #eee; color: #8b0000; }
 .badge.zr { background: var(--zr); color: var(--accent-dark); }
+.badge.vat { background: #eef1f8; color: #34508a; }
+.badge.ex { background: #eef5ee; color: #2f6b3a; }
 
 .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
 dl { display: grid; grid-template-columns: 130px 1fr; gap: 4px 12px; margin: 0; }

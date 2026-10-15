@@ -1,8 +1,11 @@
 """Saved invoice -> EIS e-invoice JSON (CAS-issued, v2.1).
 
 Field names and order follow the draft in docs/EIS_SPEC_NOTES.md section 5.
-Zero-rated rules (BIR sample JSON-02): VATAmt 0.00, TotNetItemSales = sum of
-NetSales, TotNetSalesAftDisct = same, NetAmtPay = same.
+TransClass is the sale type picked on the invoice. Zero-rated rules (BIR sample
+JSON-02): VATAmt 0.00, TotNetItemSales = sum of NetSales, TotNetSalesAftDisct =
+same, NetAmtPay = same. VAT-exempt works the same way. VATable: amounts are net
+of VAT (UnitCost "Net of VAT"), VATAmt = 12% of the net total and NetAmtPay =
+net total + VATAmt.
 """
 from __future__ import annotations
 
@@ -43,7 +46,7 @@ def build(inv: Invoice, cfg: Config) -> dict:
         "IssueDtm": inv.issue_date.strftime("%Y%m%d"),
         "EisUniqueId": eis_unique_id(inv, cfg),
         "DocType": codes.INVOICE,
-        "TransClass": codes.ZERO_RATED,
+        "TransClass": inv.trans_class,
         "CorrYN": "N",
         "CorrectionCd": "",
         "PrevUniqueId": "",
@@ -76,15 +79,15 @@ def build(inv: Invoice, cfg: Config) -> dict:
                      "SpeAmt": A(ZERO), "Rmk2": ""},
         "OtherTaxRev": A(ZERO),
         "TotNetSalesAftDisct": A(total),
-        "VATAmt": A(ZERO),
+        "VATAmt": A(inv.vat_php),
         "WithholdIncome": A(ZERO),
         "WithholdBusVAT": A(ZERO),
         "WithholdBusPT": A(ZERO),
         "OtherNonTaxCharge": A(ZERO),
-        "NetAmtPay": A(total),
+        "NetAmtPay": A(inv.total_due_php),
         "ForCur": {
             "Currency": "JPY",
-            "ForexAmt": A(inv.total_jpy),
+            "ForexAmt": A(inv.total_due_jpy),
             "ConvRate": Num.rate(inv.rate),
         },
         "PtuNum": cfg.ptu_num,

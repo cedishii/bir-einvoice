@@ -21,7 +21,7 @@ from decimal import Decimal
 
 from ..config import PLACEHOLDER_PREFIX, TEST_EIS_CERT_NO, TEST_PTU_NUM
 from ..models import today_ph
-from ..money import ZERO, decimals_of, round2
+from ..money import VAT_RATE, ZERO, decimals_of, round2
 from . import codes, unique_id
 from .serializer import loads
 
@@ -400,6 +400,13 @@ def _check_math(get: _Getter, issues: list[Issue]) -> None:
         if pay != expected:
             bad("NetAmtPay", expected, pay)
 
+    # VATable: amounts are net of VAT, so VATAmt is 12% of the net sales.
+    if vatable and None not in (after, vat):
+        expected = round2(after * VAT_RATE)
+        if vat != expected:
+            issues.append(Issue("LOCAL-MATH", "VATAmt",
+                                f"12% VAT on {after:.2f} is {expected:.2f}, found {vat:.2f}."))
+
 
 # --- foreign currency (SYN004, LOCAL-FX) ----------------------------------------
 
@@ -425,6 +432,11 @@ def _check_forcur(get: _Getter, issues: list[Issue]) -> None:
     # be off by up to half a centavo per unit plus half a centavo.
     qty_sum = sum((_Getter(i).num("Qty") or ZERO for i in get.items()), ZERO)
     tolerance = Decimal("0.005") * (qty_sum + len(get.items()) + 1)
+    vat = get.num("VATAmt")
+    if vat:
+        # VAT is rounded separately in JPY and in PHP, and grows the
+        # per-line rounding by 12%.
+        tolerance = tolerance * (1 + VAT_RATE) + Decimal("0.005") * (rate + 1)
     if abs(forex * rate - pay) > tolerance:
         issues.append(Issue("LOCAL-FX", "ForCur",
                             f"ForexAmt x ConvRate = {round2(forex * rate):.2f} PHP "

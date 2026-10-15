@@ -126,9 +126,11 @@ def build_message(inv: Invoice, cfg: Config, settings: EmailSettings, pdf: bytes
         f"Please find attached Service Invoice No. {inv.control_no} dated "
         f"{inv.issue_date.strftime('%B %d, %Y')}.",
         "",
-        f"  Amount:          JPY {fmt(inv.total_jpy)}",
-        f"  PHP equivalent:  PHP {fmt(inv.total_php)}",
-        "  Sale type:       Zero-rated sale (export of services)",
+        *([f"  Amount:          JPY {fmt(inv.total_jpy)} + 12% VAT JPY {fmt(inv.vat_jpy)}"]
+          if inv.is_vatable else []),
+        f"  Total due:       JPY {fmt(inv.total_due_jpy)}",
+        f"  PHP equivalent:  PHP {fmt(inv.total_due_php)}",
+        f"  Sale type:       {inv.sale_type}",
         "",
         *(f"  {line.description}" for line in inv.lines),
         "",

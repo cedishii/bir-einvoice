@@ -19,7 +19,7 @@ from reportlab.platypus import (Image, KeepTogether, Paragraph, SimpleDocTemplat
                                 Spacer, Table, TableStyle)
 
 from ..config import LOGO_PATH, Config
-from ..models import PH_TZ, Invoice
+from ..models import PH_TZ, VAT_EXEMPT, VATABLE, ZERO_RATED, Invoice
 from ..money import ZERO, amount_in_words, fmt, fmt_qty
 
 INK = colors.HexColor("#1a1a1a")
@@ -104,8 +104,11 @@ def _header(inv: Invoice, cfg: Config):
     return t
 
 
-def _banner():
-    t = Table([[Paragraph("ZERO-RATED SALE", S_BANNER)]], colWidths=[CONTENT_W])
+BANNERS = {VATABLE: "VATABLE SALE", ZERO_RATED: "ZERO-RATED SALE", VAT_EXEMPT: "VAT-EXEMPT SALE"}
+
+
+def _banner(inv: Invoice):
+    t = Table([[Paragraph(BANNERS[inv.trans_class], S_BANNER)]], colWidths=[CONTENT_W])
     t.setStyle(TableStyle([
         ("BOX", (0, 0), (-1, -1), 1.2, RED),
         ("BACKGROUND", (0, 0), (-1, -1), ZR_FILL),
@@ -169,11 +172,16 @@ def _summary(inv: Invoice):
     # Left: totals in JPY and PHP and the amount in words. The exchange rate
     # itself is not printed (company decision); it is kept with the invoice
     # and sent to BIR as ForCur.ConvRate.
-    left_rows = [
-        [_p("TOTAL AMOUNT (JPY)", S_LABEL), _p(_money(inv.total_jpy), S_RIGHT_B)],
-        [_p("PHP EQUIVALENT", S_LABEL), _p(_money(inv.total_php), S_RIGHT_B)],
-    ]
-    left = Table(left_rows, colWidths=[1.6 * inch, 1.9 * inch])
+    if inv.is_vatable:
+        left_rows = [
+            [_p("NET OF VAT (JPY)", S_LABEL), _p(_money(inv.total_jpy), S_RIGHT)],
+            [_p("ADD: 12% VAT (JPY)", S_LABEL), _p(_money(inv.vat_jpy), S_RIGHT)],
+            [_p("TOTAL DUE (JPY)", S_LABEL), _p(_money(inv.total_due_jpy), S_RIGHT_B)],
+        ]
+    else:
+        left_rows = [[_p("TOTAL AMOUNT (JPY)", S_LABEL), _p(_money(inv.total_jpy), S_RIGHT_B)]]
+    left_rows.append([_p("PHP EQUIVALENT", S_LABEL), _p(_money(inv.total_due_php), S_RIGHT_B)])
+    left = Table(left_rows, colWidths=[1.75 * inch, 1.75 * inch])
     left.setStyle(TableStyle([
         ("BOX", (0, 0), (-1, -1), 0.8, LINE),
         ("LINEBELOW", (0, 0), (-1, -2), 0.3, colors.HexColor("#cccccc")),
@@ -182,31 +190,32 @@ def _summary(inv: Invoice):
     words = [
         Spacer(0, 6),
         _p("THE SUM OF", S_LABEL),
-        _p(amount_in_words(inv.total_jpy, "YEN"), _style("w", 8.5, bold=True)),
-        _p(f"(PHP equivalent: {amount_in_words(inv.total_php, 'PESOS')})", S_SMALL),
+        _p(amount_in_words(inv.total_due_jpy, "YEN"), _style("w", 8.5, bold=True)),
+        _p(f"(PHP equivalent: {amount_in_words(inv.total_due_php, 'PESOS')})", S_SMALL),
     ]
 
-    # Right: the BIR sales summary box, as on the paper receipt.
-    zr = inv.total_php
-    box = [
-        ["VATable Sales", ZERO],
-        ["VAT-Exempt Sales", ZERO],
-        ["Zero-Rated Sales", zr],
-        ["Total Sales", zr],
-        ["VAT Amount", ZERO],
+    # Right: the BIR sales summary box, as on the paper receipt. The sales go
+    # in the row of the invoice's sale type, which is highlighted.
+    net = inv.total_php
+    kinds = [(VATABLE, "VATable Sales"), (VAT_EXEMPT, "VAT-Exempt Sales"),
+             (ZERO_RATED, "Zero-Rated Sales")]
+    box = [[label, net if code == inv.trans_class else ZERO] for code, label in kinds] + [
+        ["Total Sales", net],
+        ["VAT Amount (12%)", inv.vat_php],
         ["Less: Withholding Tax", ZERO],
-        ["TOTAL AMOUNT DUE (PHP)", zr],
+        ["TOTAL AMOUNT DUE (PHP)", inv.total_due_php],
     ]
     right_rows = [[_p(k, S_BODY), _p(_money(v), S_RIGHT)] for k, v in box]
-    right_rows[2] = [_p("Zero-Rated Sales", _style("zr", 9, bold=True, color=RED)),
-                     _p(_money(zr), _style("zrv", 9, bold=True, align=TA_RIGHT, color=RED))]
+    hl = [code for code, _ in kinds].index(inv.trans_class)
+    right_rows[hl] = [_p(kinds[hl][1], _style("hl", 9, bold=True, color=RED)),
+                      _p(_money(net), _style("hlv", 9, bold=True, align=TA_RIGHT, color=RED))]
     right_rows[-1] = [_p("TOTAL AMOUNT DUE (PHP)", _style("tad", 9, bold=True)),
-                      _p(_money(zr), S_RIGHT_B)]
+                      _p(_money(inv.total_due_php), S_RIGHT_B)]
     right = Table(right_rows, colWidths=[1.85 * inch, 1.45 * inch])
     right.setStyle(TableStyle([
         ("BOX", (0, 0), (-1, -1), 0.8, LINE),
         ("LINEBELOW", (0, 0), (-1, -2), 0.3, colors.HexColor("#cccccc")),
-        ("BACKGROUND", (0, 2), (-1, 2), ZR_FILL),
+        ("BACKGROUND", (0, hl), (-1, hl), ZR_FILL),
         ("LINEABOVE", (0, -1), (-1, -1), 0.8, LINE),
         ("BACKGROUND", (0, -1), (-1, -1), SHADE),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
@@ -281,11 +290,11 @@ def render(inv: Invoice, cfg: Config) -> bytes:
         buf, pagesize=LETTER, leftMargin=MARGIN, rightMargin=MARGIN,
         topMargin=MARGIN, bottomMargin=0.6 * inch,
         title=f"Service Invoice {inv.control_no}", author=cfg.seller.reg_nm,
-        subject="Service Invoice (zero-rated sale)",
+        subject=f"Service Invoice ({inv.sale_type})",
     )
     story = [
         _header(inv, cfg), Spacer(0, 10),
-        _banner(), Spacer(0, 10),
+        _banner(inv), Spacer(0, 10),
         _client(inv), Spacer(0, 12),
         _lines(inv), Spacer(0, 12),
         KeepTogether([_summary(inv), Spacer(0, 14), _signature()]),
