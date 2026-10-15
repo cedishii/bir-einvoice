@@ -368,7 +368,7 @@ def audit_log(conn: sqlite3.Connection, start: date, end: date, *, user: str | N
     """Everything done in the app: entries, changes (with before and after),
     cancellations, sign-ins, printouts and exports, each with the user and
     the computer it was done from."""
-    r = Report("audit", "Audit Trail", start, end, [
+    r = Report("audit", "History (Audit Trail)", start, end, [
         Column("When", width=1.3), Column("User", width=0.9), Column("Computer", width=1.2),
         Column("Action", width=1.0), Column("Record", width=1.1), Column("Details", width=4.2)])
     sql = "SELECT * FROM audit_log WHERE substr(at, 1, 10) BETWEEN ? AND ?"

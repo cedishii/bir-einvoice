@@ -58,7 +58,7 @@ def create_app(config: Config | None = None, transport: TransportSettings | None
 
     app.extensions["einvoice"] = {"repo": repo, "cfg": cfg}
     app.register_blueprint(books.bp)
-    auth_views.install(app)  # logins, roles, and who did what
+    auth_views.install(app)  # sign-in, so the history shows who did what
     try:
         backup.daily(cfg())
     except OSError:
@@ -197,9 +197,8 @@ def create_app(config: Config | None = None, transport: TransportSettings | None
         exported = eis_export.existing_export(repo().conn, cfg(), inv)
         bir = eis_service.status_of(repo().conn, exported.eis_unique_id) if exported else None
         books_entry = ledger.entry_for(repo().conn, "invoice", inv.id)
-        history = ledger.history(repo().conn, "invoice", inv.control_no)
         return render_template("detail.html", inv=inv, exported=exported, bir=bir,
-                               books_entry=books_entry, history=history,
+                               books_entry=books_entry,
                                books_reversal=books_entry and ledger.reversal_of(repo().conn, books_entry["id"]),
                                balance=postings.invoice_balance(repo().conn, inv.id),
                                emails=emailer.history(repo().conn, inv),

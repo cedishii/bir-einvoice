@@ -10,7 +10,7 @@
   </div>
   <div class="actions">
     <a href="{{ url_for('books.suppliers') }}">Suppliers</a>
-    {% if can('encode') %}<a class="button" href="{{ url_for('books.new_bill') }}">+ Record bill</a>{% endif %}
+    <a class="button" href="{{ url_for('books.new_bill') }}">+ Record bill</a>
   </div>
 </div>
 {% if rows %}
@@ -27,7 +27,7 @@
       <td class="muted">{{ b.created_by or "-" }}{% if b.cancelled_by %}<small class="block">cancelled by {{ b.cancelled_by }}</small>{% endif %}</td>
       <td><span class="badge {{ b.status }}">{{ b.status }}</span>
         {% if b.cancel_reason %}<small class="muted block">{{ b.cancel_reason }}</small>{% endif %}</td>
-      <td>{% if b.status == "posted" and can('approve') %}{{ cancel_form(url_for('books.cancel', kind='bill', doc_id=b.id), "bill") }}{% endif %}</td>
+      <td>{% if b.status == "posted" %}{{ cancel_form(url_for('books.cancel', kind='bill', doc_id=b.id), "bill") }}{% endif %}</td>
     </tr>
   {% endfor %}
   </tbody>

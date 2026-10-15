@@ -36,11 +36,9 @@
       <a href="{{ url_for('index') }}" title="Invoices"
          class="{{ 'active' if ep in ('index', 'show_invoice', 'test_export_invoice') }}">
         <span class="icon">&#9776;</span><span class="label">Invoices</span></a>
-      {% if can('encode') %}
       <a href="{{ url_for('new_invoice') }}" title="New invoice"
          class="{{ 'active' if ep in ('new_invoice', 'review_invoice', 'edit_invoice', 'issue_invoice') }}">
         <span class="icon">&#43;</span><span class="label">New invoice</span></a>
-      {% endif %}
       <a href="{{ url_for('bir_page') }}" title="BIR" class="{{ 'active' if ep.startswith('bir') }}">
         <span class="icon">&#8645;</span><span class="label">BIR
         {% if not transport.is_sandbox %}<span class="badge live">LIVE</span>{% endif %}</span></a>
@@ -66,19 +64,15 @@
       <a href="{{ url_for('books.accounts') }}" title="Setup"
          class="{{ 'active' if ep in ('books.accounts', 'books.suppliers', 'books.customers') }}">
         <span class="icon">&#9881;</span><span class="label">Accounts &amp; parties</span></a>
-      <a href="{{ url_for('books.report', key='audit') }}" title="Audit trail"
+      <a href="{{ url_for('books.report', key='audit') }}" title="History: what everyone did"
          class="{{ 'active' if ep == 'books.report' and request.view_args.get('key') == 'audit' }}">
-        <span class="icon">&#128269;</span><span class="label">Audit trail</span></a>
-      {% if can('admin') %}
-      <a href="{{ url_for('auth.users') }}" title="Users" class="{{ 'active' if ep == 'auth.users' }}">
-        <span class="icon">&#128101;</span><span class="label">Users</span></a>
-      {% endif %}
+        <span class="icon">&#128269;</span><span class="label">History</span></a>
     </nav>
     <div class="sidebar-foot label">
       {% if me %}
       <div class="who">
         <a href="{{ url_for('auth.account') }}" title="My account">{{ me.full_name }}</a>
-        <small>{{ me.username }} · {{ roles[me.role] }}</small>
+        <small>{{ me.username }}</small>
         <form method="post" action="{{ url_for('auth.logout') }}"><button class="link" type="submit">Sign out</button></form>
       </div>
       {% endif %}
@@ -191,7 +185,7 @@
   });
 </script>
 
-{% if can('encode') and ep not in ('new_invoice', 'review_invoice', 'edit_invoice', 'issue_invoice') %}
+{% if me and ep not in ('new_invoice', 'review_invoice', 'edit_invoice', 'issue_invoice') %}
 <a class="fab" href="{{ url_for('new_invoice') }}" title="New invoice">
   <span>+</span> New invoice
 </a>

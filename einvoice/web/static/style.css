@@ -241,7 +241,12 @@ tr.cancelled td { color: #999; }
 body.bare { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 24px 16px; }
 .bare-card { width: min(420px, 100%); background: var(--card); border-radius: 12px; padding: 28px 28px 22px;
              box-shadow: 0 10px 40px rgba(0, 0, 0, .08); }
-.bare-card img { width: 130px; display: block; margin-bottom: 14px; }
+.bare-card .auth-logo { width: 170px; display: block; margin: 4px auto 22px; }
+.auth-tabs { display: flex; gap: 4px; background: #f0f0f2; border-radius: 8px; padding: 4px; margin-bottom: 18px; }
+.auth-tabs a { flex: 1; text-align: center; padding: 8px; border-radius: 6px; text-decoration: none;
+               color: var(--muted); font-weight: 600; }
+.auth-tabs a.active { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(0, 0, 0, .1); }
+.center { text-align: center; }
 .bare-card h1 { font-size: 20px; margin: 0 0 4px; }
 .bare-card .button { width: 100%; padding: 11px; margin-top: 6px; }
 .notice-box { background: #fff6d6; border: 1px solid #ecd98a; border-radius: 8px; padding: 10px 14px; margin: 12px 0; }

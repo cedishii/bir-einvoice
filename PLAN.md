@@ -329,3 +329,12 @@ every input can be traced to a person. "If you have more ideas, do it."
   activity), supplier corrections with before / after, audit report filters,
   daily automatic backup (`einvoice/backup.py`, keeps 30).
 - Tests sign in through `tests/conftest.py::sign_in`.
+
+Simplified 2026-10-15 at the user's request (only 2 people with the same
+access): no first-run setup, no roles, no user administration. The sign-in page
+(logo centred) has Sign in / Create account; a new account works at once. One
+general History page (the audit trail) where both users see each other's
+actions; no per-record history. Kept: hash-chained history, no deletions,
+before / after values, lockout after 5 wrong passwords, 30-minute idle
+sign-out, daily backups. The users.role / must_change columns from migration
+8 stay but are unused (role is always "admin").

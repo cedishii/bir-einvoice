@@ -1,18 +1,20 @@
 {% extends "base.html" %}
 {% block title %}My account{% endblock %}
 {% block content %}
-<div class="heading">
-  <h1>{{ me.full_name }}</h1>
-  <p class="muted">{{ me.username }} · {{ roles[me.role] }}{% if me.last_login_at %} · signed in {{ me.last_login_at.replace("T", " ")[:16] }}{% endif %}</p>
+<div class="heading with-actions">
+  <div>
+    <h1>{{ me.full_name }}</h1>
+    <p class="muted">{{ me.username }}{% if me.last_login_at %} · signed in {{ me.last_login_at.replace("T", " ")[:16] }}{% endif %}</p>
+  </div>
+  <div class="actions"><a class="button secondary" href="{{ url_for('auth.download_backup') }}">Download a backup</a></div>
 </div>
 
 <form method="post" action="{{ url_for('auth.change_password') }}" class="card">
-  <h2>{{ "Choose your own password" if me.must_change else "Change password" }}</h2>
-  {% if me.must_change %}<p class="notice-box">You signed in with a temporary password. Choose your own to continue.</p>{% endif %}
+  <h2>Change password</h2>
   <div class="row three">
     <label class="field"><span>Current password</span><input type="password" name="current" autocomplete="current-password" required></label>
     <label class="field"><span>New password</span><input type="password" name="new" autocomplete="new-password" required>
-      <small>At least 8 characters, with letters and numbers</small></label>
+      <small>At least 6 characters</small></label>
     <label class="field"><span>New password again</span><input type="password" name="new2" autocomplete="new-password" required></label>
   </div>
   <div class="actions"><button class="button" type="submit">Save password</button></div>
@@ -20,7 +22,6 @@
 
 <section class="card">
   <h2>Recent sign-ins</h2>
-  <p class="muted">If you see a sign-in you don't recognise, change your password and tell an administrator.</p>
   <table class="grid compact">
     <thead><tr><th>When</th><th>What</th><th>Computer</th></tr></thead>
     <tbody>

@@ -22,9 +22,8 @@
   <tbody>
   {% for p in rows %}
     <tr><td>{{ p.name }}</td><td>{{ tin(p.tin, p.branch) or "none (foreign)" }}</td><td>{{ p.address }}</td>
-      <td><a href="{{ url_for('books.report', key='ap' if kind == 'supplier' else 'ar', party=p.id) }}">Ledger</a> ·
-        <a href="{{ url_for('books.report', key='audit', entity=kind, id=p.id, **{'from': '2000-01-01'}) }}">History</a>
-        {% if kind == "supplier" and can('approve') %}
+      <td><a href="{{ url_for('books.report', key='ap' if kind == 'supplier' else 'ar', party=p.id) }}">Ledger</a>
+        {% if kind == "supplier" %}
         <details><summary class="muted">Correct</summary>
           <form method="post" action="{{ url_for('books.update_supplier', supplier_id=p.id) }}">
             <label class="field"><span>Registered name</span><input name="name" value="{{ p.name }}" maxlength="200" required></label>
@@ -40,7 +39,7 @@
 <p class="empty">{{ "No suppliers yet." if kind == "supplier" else "No clients yet. They are added when invoices are issued." }}</p>
 {% endif %}
 
-{% if kind == "supplier" and can('encode') %}
+{% if kind == "supplier" %}
 <form method="post" action="{{ url_for('books.add_supplier') }}" class="card">
   <h2>Add a supplier</h2>
   <div class="row">

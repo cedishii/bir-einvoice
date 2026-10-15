@@ -11,7 +11,7 @@ from einvoice.web.app import create_app
 from tests.conftest import make_invoice, sign_in
 from tests.test_form import form
 
-PW = "Passw0rd-test"
+PW = "secret1"
 
 
 @pytest.fixture
@@ -35,110 +35,92 @@ def audit_rows(conn, **where):
     return conn.execute(sql + " ORDER BY id", list(where.values())).fetchall()
 
 
-def test_first_run_creates_the_administrator(app, conn):
+def test_sign_in_page_comes_first(app):
     c = app.test_client()
-    assert c.get("/").location.endswith("/setup")
-    r = c.post("/setup", data={"full_name": "Ana Reyes", "username": "Ana",
-                               "password": "Secret123", "password2": "Secret123"})
-    assert r.status_code == 302 and r.location.endswith("/login")
-    u = conn.execute("SELECT * FROM users").fetchone()
-    assert (u["username"], u["role"], u["must_change"]) == ("ana", "admin", 0)
-    assert c.get("/setup").location.endswith("/login")  # closed once a user exists
-    assert c.get("/").location.startswith("/login")
-    r = c.post("/login", data={"username": "ANA", "password": "Secret123"})
+    r = c.get("/")
+    assert r.status_code == 302 and r.location.startswith("/login")
+    page = c.get("/login").get_data(as_text=True)
+    assert "Sign in" in page and "Create account" in page and "auth-logo" in page
+
+
+def test_create_account_and_use_it_right_away(app, conn):
+    c = app.test_client()
+    r = c.post("/signup", data={"full_name": "Ana  Reyes", "username": "Ana",
+                                "password": PW, "password2": PW})
+    assert r.status_code == 302 and r.location.endswith("/")
+    assert "Ana Reyes" in c.get("/").get_data(as_text=True)
+    assert conn.execute("SELECT username, full_name FROM users").fetchone()[:] == ("ana", "Ana Reyes")
+    c.post("/logout")
+    assert c.get("/").status_code == 302
+    r = c.post("/login", data={"username": "ANA", "password": PW})
     assert r.status_code == 302
-    page = c.get("/").get_data(as_text=True)
-    assert "Ana Reyes" in page and "Add at least" not in page  # the notice is on /users
-    assert "Add at least 2 active users" in c.get("/users").get_data(as_text=True)
+    assert [x["action"] for x in audit_rows(conn, entity_id="ana")] == [
+        "create account", "sign in", "sign out", "sign in"]
 
 
-def test_password_rules():
-    for bad, msg in [("short1", "at least 8"), ("lettersonly", "letters and numbers"),
-                     ("maria2024x", "username")]:
-        with pytest.raises(auth.AuthError, match=msg):
-            auth.check_password_rules(bad, "maria")
+def test_sign_up_problems(app):
+    c = app.test_client()
+    for data, msg in [({"password2": "other1"}, "don&#39;t match"),
+                      ({"password": "12345", "password2": "12345"}, "at least 6"),
+                      ({"username": "a"}, "Username")]:
+        r = c.post("/signup", data={"full_name": "X", "username": "xavier", "password": PW,
+                                    "password2": PW} | data)
+        assert r.status_code == 422 and msg in r.get_data(as_text=True), msg
+    c.post("/signup", data={"full_name": "X", "username": "xavier", "password": PW, "password2": PW})
+    r = app.test_client().post("/signup", data={"full_name": "Y", "username": "xavier",
+                                                "password": PW, "password2": PW})
+    assert "taken" in r.get_data(as_text=True)
 
 
-def test_failed_logins_are_audited_and_lock_the_account(app, conn):
-    auth.create_user(conn, username="maria", full_name="Maria Santos", role="encoder",
-                     password=PW, by="test")
+def test_wrong_passwords_are_recorded_and_lock_for_a_while(app, conn):
+    auth.create_user(conn, username="maria", full_name="Maria Santos", password=PW)
     c = app.test_client()
     for _ in range(auth.MAX_FAILED_LOGINS):
-        r = c.post("/login", data={"username": "maria", "password": "wrong-pass1"})
-        assert r.status_code == 401
-    r = c.post("/login", data={"username": "maria", "password": PW})  # right, but locked
-    assert r.status_code == 401 and "Too many failed logins" in r.get_data(as_text=True)
-    actions = [x["action"] for x in audit_rows(conn, entity="user", entity_id="maria")]
-    assert actions.count("login failed") == 5 and actions[-1] == "login refused"
-    c.post("/login", data={"username": "nobody", "password": "x"})
-    assert audit_rows(conn, action="login failed", user="nobody")[0]["detail"] == "unknown username"
+        assert c.post("/login", data={"username": "maria", "password": "nope"}).status_code == 401
+    r = c.post("/login", data={"username": "maria", "password": PW})
+    assert r.status_code == 401 and "Too many wrong passwords" in r.get_data(as_text=True)
+    assert len(audit_rows(conn, action="sign-in failed", user="maria")) == 5
 
 
-def test_new_user_must_choose_a_password(app, conn):
-    admin = sign_in(app)
-    r = admin.post("/users", data={"full_name": "Jose Cruz", "username": "jose",
-                                   "role": "encoder", "password": "Temp1234"})
-    assert r.status_code == 302
-    jose = app.test_client()
-    jose.post("/login", data={"username": "jose", "password": "Temp1234"})
-    assert jose.get("/").location.endswith("/account")
-    r = jose.post("/account/password", data={"current": "Temp1234", "new": "Mine5678x",
-                                             "new2": "Mine5678x"})
-    assert r.location.endswith("/")
-    assert jose.get("/").status_code == 200
+def test_change_password(app, conn):
+    c = sign_in(app)
+    c.post("/account/password", data={"current": "Passw0rd-test", "new": "newpass1",
+                                      "new2": "newpass1"})
+    assert app.test_client().post("/login", data={"username": "admin",
+                                                  "password": "newpass1"}).status_code == 302
 
 
-@pytest.mark.parametrize("role,can_issue,can_void,can_users", [
-    ("auditor", False, False, False),
-    ("encoder", True, False, False),
-    ("accountant", True, True, False),
-    ("admin", True, True, True),
-])
-def test_roles(app, conn, role, can_issue, can_void, can_users):
-    boss = sign_in(app)  # an admin issues one invoice to work on
-    boss.post("/invoices/issue", data=form() | {"token": "seed"})
-    c = sign_in(app, username=f"u-{role}", role=role)
-    c.post("/invoices/issue", data=form() | {"token": f"t-{role}"})
-    issued = conn.execute("SELECT COUNT(*) FROM invoices").fetchone()[0]
-    assert issued == (2 if can_issue else 1)
-    c.post("/invoices/0001773/void", data={"reason": "test"})
-    status = conn.execute("SELECT status FROM invoices WHERE control_no = '0001773'").fetchone()[0]
-    assert status == ("void" if can_void else "issued")
-    assert (c.get("/users").status_code == 200) == can_users
-    assert c.get("/books/report/audit").status_code == 200  # everyone can read the trail
-    if not can_issue:
-        assert audit_rows(conn, action="refused", user=f"u-{role}")
-
-
-def test_everything_is_recorded_under_the_signed_in_user(app, conn):
-    c = sign_in(app, username="enc", role="encoder")
-    c.post("/invoices/issue", data=form() | {"token": "t1"})
+def test_both_users_see_what_the_other_did(app, conn):
+    ana, jose = sign_in(app, "ana"), sign_in(app, "jose")
+    jose.post("/invoices/issue", data=form() | {"token": "t1"})
+    ana.post("/invoices/0001773/void", data={"reason": "Wrong client"})
     inv = conn.execute("SELECT * FROM invoices").fetchone()
-    assert inv["issued_by"] == "enc"
-    assert conn.execute("SELECT created_by FROM journal_entries").fetchone()[0] == "enc"
+    assert (inv["issued_by"], inv["voided_by"]) == ("jose", "ana")
+    by = {r["action"]: r["user"] for r in audit_rows(conn, entity="invoice")}
+    assert by == {"issue invoice": "jose", "void invoice": "ana"}
+    assert conn.execute("SELECT created_by FROM journal_entries ORDER BY id").fetchall()[0][0] == "jose"
+    for c in (ana, jose):
+        page = c.get("/books/report/audit?from=2000-01-01").get_data(as_text=True)
+        assert "issue invoice" in page and "void invoice" in page and "Wrong client" in page
     row = audit_rows(conn, action="issue invoice")[0]
-    assert row["user"] == "enc" and row["entity_id"] == "0001773" and "@" in row["workstation"]
-    c.get("/invoices/0001773/pdf")
-    assert audit_rows(conn, action="print invoice", user="enc")
-    detail = c.get("/invoices/0001773").get_data(as_text=True)
-    assert "History" in detail and "issue invoice" in detail
+    assert "@" in row["workstation"]
 
 
-def test_modifications_keep_before_and_after(app, conn):
-    c = sign_in(app, username="acct", role="accountant")
+def test_changes_keep_before_and_after(app, conn):
+    c = sign_in(app)
     c.post("/suppliers", data={"name": "ACME", "tin": "123456789", "address": "Makati"})
     c.post("/suppliers/1", data={"name": "ACME INC.", "tin": "123456789", "address": "Pasig"})
     row = audit_rows(conn, action="change supplier")[0]
     assert json.loads(row["changes"]) == {"name": ["ACME", "ACME INC."],
                                           "address": ["Makati", "Pasig"]}
     c.post("/accounts/5100", data={"name": "Office Rent", "active": "1"})
-    row = audit_rows(conn, action="change account")[0]
-    assert json.loads(row["changes"]) == {"name": ["Rent Expense", "Office Rent"]}
-    trail = c.get("/books/report/audit?entity=supplier&id=1").get_data(as_text=True)
-    assert "name: ACME -&gt; ACME INC." in trail and "Office Rent" not in trail
+    assert json.loads(audit_rows(conn, action="change account")[0]["changes"]) == {
+        "name": ["Rent Expense", "Office Rent"]}
+    page = c.get("/books/report/audit?from=2000-01-01").get_data(as_text=True)
+    assert "name: ACME -&gt; ACME INC." in page
 
 
-def test_nothing_can_be_deleted_and_the_trail_is_sealed(repo):
+def test_nothing_can_be_deleted_and_the_history_is_sealed(repo):
     conn = repo.conn
     repo.issue(make_invoice())
     for sql in ("DELETE FROM invoices", "DELETE FROM invoice_lines", "DELETE FROM customers",
@@ -155,23 +137,9 @@ def test_nothing_can_be_deleted_and_the_trail_is_sealed(repo):
 def test_rows_from_before_the_upgrade_are_sealed(conn):
     conn.execute("INSERT INTO audit_log (at, user, action, detail) VALUES "
                  "('2026-01-01T00:00:00+08:00', 'old', 'post', 'legacy row')")
-    assert conn.execute("SELECT hash FROM audit_log").fetchone()[0] == ""
     ledger.seal_audit(conn)
     assert conn.execute("SELECT hash FROM audit_log").fetchone()[0] != ""
     assert ledger.verify_audit(conn) == []
-
-
-def test_admin_safeguards(app, conn):
-    c = sign_in(app)
-    me = conn.execute("SELECT id FROM users WHERE username = 'admin'").fetchone()[0]
-    with pytest.raises(auth.AuthError, match="own role"):
-        auth.update_user(conn, me, full_name="x", role="encoder", active=True, by_id=me)
-    other = auth.create_user(conn, username="enc2", full_name="E", role="encoder", password=PW)
-    auth.update_user(conn, other, full_name="E", role="encoder", active=False, by_id=me)
-    assert c.get("/users").status_code == 200
-    blocked = app.test_client()
-    r = blocked.post("/login", data={"username": "enc2", "password": PW})
-    assert r.status_code == 401 and "deactivated" in r.get_data(as_text=True)
 
 
 def test_idle_sessions_end(app):
@@ -187,15 +155,12 @@ def test_backups(app, config, conn):
     assert audit_rows(conn, action="backup")
     path = backup.daily(config)
     assert path is not None and path.exists() and backup.daily(config) is None  # once a day
-    enc = sign_in(app, username="enc", role="encoder")
-    assert enc.get("/backup").status_code == 302  # refused
 
 
-def test_audit_report_filters(app, conn):
+def test_history_filters(app, conn):
     a = sign_in(app)
-    sign_in(app, username="enc", role="encoder").post(
-        "/invoices/issue", data=form() | {"token": "x"})
-    r = reports.audit_log(conn, date(2000, 1, 1), date(2100, 1, 1), user="enc")
-    assert {row.cells[1] for row in r.rows} == {"enc"}
-    page = a.get("/books/report/audit?from=2000-01-01&user=enc").get_data(as_text=True)
-    assert "issue invoice" in page and "Filtered by user enc" in page
+    sign_in(app, "jose").post("/invoices/issue", data=form() | {"token": "x"})
+    r = reports.audit_log(conn, date(2000, 1, 1), date(2100, 1, 1), user="jose")
+    assert {row.cells[1] for row in r.rows} == {"jose"}
+    page = a.get("/books/report/audit?from=2000-01-01&user=jose").get_data(as_text=True)
+    assert "issue invoice" in page and "Filtered by user jose" in page

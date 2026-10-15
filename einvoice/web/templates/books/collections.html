@@ -7,7 +7,7 @@
     <h1>Collections</h1>
     <p class="muted">Payments received from clients. Each one posts to the Cash Receipts Journal.</p>
   </div>
-  <div class="actions">{% if can('encode') %}<a class="button" href="{{ url_for('books.new_collection') }}">+ Record collection</a>{% endif %}</div>
+  <div class="actions"><a class="button" href="{{ url_for('books.new_collection') }}">+ Record collection</a></div>
 </div>
 
 <section class="card">
@@ -40,7 +40,7 @@
       <td class="muted">{{ k.created_by or "-" }}{% if k.cancelled_by %}<small class="block">cancelled by {{ k.cancelled_by }}</small>{% endif %}</td>
       <td><span class="badge {{ k.status }}">{{ k.status }}</span>
         {% if k.cancel_reason %}<small class="muted block">{{ k.cancel_reason }}</small>{% endif %}</td>
-      <td>{% if k.status == "posted" and can('approve') %}{{ cancel_form(url_for('books.cancel', kind='collection', doc_id=k.id), "collection") }}{% endif %}</td>
+      <td>{% if k.status == "posted" %}{{ cancel_form(url_for('books.cancel', kind='collection', doc_id=k.id), "collection") }}{% endif %}</td>
     </tr>
   {% endfor %}
   </tbody>

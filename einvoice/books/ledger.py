@@ -151,12 +151,6 @@ def verify_audit(conn: sqlite3.Connection) -> list[str]:
     return problems
 
 
-def history(conn: sqlite3.Connection, entity: str, entity_id: str | int) -> list[sqlite3.Row]:
-    """Audit rows about one record, oldest first."""
-    return conn.execute("SELECT * FROM audit_log WHERE entity = ? AND entity_id = ? ORDER BY id",
-                        (entity, str(entity_id))).fetchall()
-
-
 # --- Accounts ----------------------------------------------------------------
 
 def account_for(conn: sqlite3.Connection, role: str) -> str:

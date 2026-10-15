@@ -26,7 +26,7 @@ REPORTS = {
     "sls": "Summary List of Sales", "slp": "Summary List of Purchases",
     "wt-issued": "Tax withheld from suppliers (Form 2307 to issue)",
     "wt-received": "Tax withheld by clients (Form 2307 received)",
-    "audit": "Audit trail",
+    "audit": "History (audit trail)",
 }
 QUARTERLY = ("sls", "slp", "wt-issued", "wt-received")
 MAX_ENTRY_LINES = 30
@@ -225,9 +225,6 @@ def show_entry(entry_id):
     lines = ledger.entry_lines(c, entry_id)
     return render_template("books/entry.html", e=e, lines=lines, invoice_no=invoice_no,
                            total=sum((Decimal(l["debit"]) for l in lines), money.ZERO),
-                           history=ledger.history(c, "journal", f"{e['book']}-{e['entry_no']}")
-                           + (ledger.history(c, e["source_type"], e["source_id"])
-                              if e["source_type"] in ("collection", "bill", "payment") else []),
                            party=names.get((e["party_type"], e["party_id"]), ""),
                            reversal=ledger.reversal_of(c, entry_id),
                            reverses=ledger.entry(c, e["source_id"]) if e["source_type"] == "reversal" else None,

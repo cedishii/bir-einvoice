@@ -42,15 +42,15 @@ def make_invoice(**overrides) -> Invoice:
     return Invoice(**fields).compute()
 
 
-def sign_in(app, username="admin", role="admin", password="Passw0rd-test"):
-    """A test client signed in as `username` (created with `role` if new)."""
+def sign_in(app, username="admin", password="Passw0rd-test"):
+    """A test client signed in as `username` (account created if new)."""
     from einvoice import auth
     cfg = app.config["EINVOICE"]
     conn = connect(cfg.db_path)
     try:
         if not conn.execute("SELECT 1 FROM users WHERE username = ?", (username,)).fetchone():
-            auth.create_user(conn, username=username, full_name=f"Test {username}", role=role,
-                             password=password, must_change=False, by="test")
+            auth.create_user(conn, username=username, full_name=f"Test {username}",
+                             password=password)
     finally:
         conn.close()
     client = app.test_client()

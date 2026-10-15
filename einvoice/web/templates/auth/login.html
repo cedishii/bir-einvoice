@@ -1,13 +1,33 @@
 {% extends "auth/_bare.html" %}
+{% block title %}{{ "Create account" if mode == "signup" else "Sign in" }}{% endblock %}
 {% block content %}
-<h1>Sign in</h1>
-<p class="muted">Micronet e-Invoice and books of accounts. Everything you enter is recorded under your name.</p>
-<form method="post">
+<div class="auth-tabs" role="tablist">
+  <a href="{{ url_for('auth.login', next=request.args.get('next')) }}" class="{{ 'active' if mode != 'signup' }}">Sign in</a>
+  <a href="{{ url_for('auth.login', mode='signup') }}" class="{{ 'active' if mode == 'signup' }}">Create account</a>
+</div>
+
+{% if mode == "signup" %}
+<form method="post" action="{{ url_for('auth.signup') }}">
+  <label class="field"><span>Your name</span>
+    <input name="full_name" value="{{ data.get('full_name', '') }}" maxlength="100" autocomplete="name" required autofocus></label>
   <label class="field"><span>Username</span>
-    <input name="username" value="{{ username }}" autocomplete="username" autocapitalize="none" autofocus required></label>
+    <input name="username" value="{{ data.get('username', '') }}" maxlength="30" autocapitalize="none" autocomplete="username" required>
+    <small>Lowercase letters, numbers, . _ or -</small></label>
+  <label class="field"><span>Password</span>
+    <input type="password" name="password" autocomplete="new-password" required>
+    <small>At least 6 characters</small></label>
+  <label class="field"><span>Password again</span>
+    <input type="password" name="password2" autocomplete="new-password" required></label>
+  <button class="button" type="submit">Create account</button>
+</form>
+{% else %}
+<form method="post" action="{{ url_for('auth.login', next=request.args.get('next')) }}">
+  <label class="field"><span>Username</span>
+    <input name="username" value="{{ data.get('username', '') }}" autocomplete="username" autocapitalize="none" required autofocus></label>
   <label class="field"><span>Password</span>
     <input type="password" name="password" autocomplete="current-password" required></label>
   <button class="button" type="submit">Sign in</button>
 </form>
-<p class="muted"><small>Forgot your password? Ask an administrator to set a temporary one.</small></p>
+<p class="muted center"><small>No account yet? <a href="{{ url_for('auth.login', mode='signup') }}">Create one</a>.</small></p>
+{% endif %}
 {% endblock %}

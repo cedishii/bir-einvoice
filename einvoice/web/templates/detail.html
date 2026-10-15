@@ -53,14 +53,12 @@
   {% elif cfg.is_prototype %}
   <p class="muted">Prototype mode: e-mails go only to the test address {{ email.test_to or "(EMAIL_TEST_TO not set)" }}, never to the client.</p>
   {% endif %}
-  {% if can('encode') %}
   <form method="post" action="{{ url_for('email_invoice_route', control_no=inv.control_no) }}"
         onsubmit="this.querySelector('button').disabled = true">
     <button type="submit" class="button secondary"
       {% if not email.is_configured or (not cfg.is_prototype and not inv.buyer_email) %}disabled{% endif %}>
       {{ "Send again" if emails else "E-mail to client" }}{% if cfg.is_prototype %} (test){% endif %}</button>
   </form>
-  {% endif %}
 </section>
 
 <section class="card">
@@ -110,21 +108,16 @@
     {% endif %}
   </p>
   <div class="actions left">
-    {% if can('approve') %}
     <form method="post" action="{{ url_for('export_invoice', control_no=inv.control_no) }}">
       <button type="submit" class="button" {% if cfg.is_prototype %}disabled title="Waiting for BIR-issued values"{% endif %}>Export e-invoice JSON</button>
     </form>
-    {% endif %}
-    {% if can('encode') %}
     <form method="post" action="{{ url_for('test_export_invoice', control_no=inv.control_no) }}">
       <button type="submit" class="button secondary">Test export</button>
     </form>
-    {% endif %}
   </div>
   {% endif %}
 </section>
 
-{% if can('approve') %}
 <details class="card danger">
   <summary>Void this invoice</summary>
   <p>Use this when the invoice has a mistake. The invoice stays on file marked VOID, its number is never used again, and you issue a new invoice with the correct details.</p>
@@ -136,7 +129,4 @@
   </form>
 </details>
 {% endif %}
-{% endif %}
-
-{% include "_history.html" %}
 {% endblock %}

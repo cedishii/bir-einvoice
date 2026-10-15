@@ -77,7 +77,6 @@
   <p class="muted">All journals, ledgers, the trial balance, the quarterly BIR reports and the audit trail as PDF and CSV,
     with a manifest of SHA-256 checksums. This is what goes on the disc for the yearly submission of computerized books.</p>
 
-  {% if can('approve') %}
   <form method="post" action="{{ url_for('books.close_books') }}" class="filters"
         onsubmit="return confirm('Close the books through ' + this.through.value + '? Nothing can be posted on or before that date afterwards, and this cannot be undone.')">
     <label class="field"><span>Close the books through</span>
@@ -85,6 +84,5 @@
     <div class="quick"><button class="button secondary" type="submit">Close period</button></div>
   </form>
   <p class="muted">After a month or year is filed, close it so nothing can be posted back into it. Corrections then go into the open period.</p>
-  {% endif %}
 </section>
 {% endblock %}

@@ -19,7 +19,7 @@ issues the EIS Certification ID and PTU number, printed invoices carry a
 | 3 | Sign / encrypt / send to BIR, fetch results | built; needs EIS enrollment to use |
 | 4 | Books of accounts, SLS / SLP, Form 2307 data | built; RELIEF .DAT files wait for BIR's official layout |
 | 5 | Tax return worksheets, QAP / SAWT, tax calendar | built; nothing is filed from the app |
-| 6 | User logins, roles, audit trail of every entry, change and attempted deletion | built |
+| 6 | Sign-in per person, shared history (audit trail) of every entry and change | built |
 
 ## Open it (Windows)
 
@@ -44,10 +44,8 @@ running app.
 
 ## Using it
 
-**First run:** the app asks for the administrator's name, username and
-password. Sign in, open **Users** and add an account for every other person
-who will use it (at least two in total). Each person signs in with their own
-account, so the audit trail shows who did what.
+**First time:** on the sign-in page, choose **Create account**. Each person
+makes their own, so the History page shows who did what.
 
 1. **+ New invoice.** Fill in the date, client (with their e-mail), the "payment for" lines in JPY,
    and the exchange rate (PHP per 1 JPY) with its date and source (kept on file
@@ -196,39 +194,34 @@ page so gross income (for the minimum corporate income tax) is right.
 Not offered: 2550M (monthly VAT, no longer filed from 2023), the monthly 1601E
 (replaced by 0619E / 1601EQ), and 1601C (needs payroll).
 
-## Users and the audit trail
+## Accounts and the history
 
-Everyone signs in with their own account. Passwords are stored hashed (never
-readable), need at least 8 characters with letters and numbers, and are
-chosen by the user: an administrator only sets a temporary one. Five wrong
-passwords in a row lock the account for 15 minutes. After 30 minutes without
-activity the user is signed out.
+Each person signs in with their own account. On the sign-in page, **Create
+account** makes one (name, username, password of at least 6 characters) that
+works right away. Everyone signed in can do everything; the point is that the
+**History** page (the audit trail) shows who did what, and both users can see
+each other's actions there.
 
-| Role | Can |
-|---|---|
-| Administrator | everything, including users and backups |
-| Accountant | enter documents; void, cancel and reverse; close periods; chart of accounts, suppliers and tax settings; EIS export and sending to BIR |
-| Encoder | enter invoices, collections, bills, payments and journal entries |
-| Auditor | read everything (books, reports, audit trail), change nothing |
+The history records every action with the user, the Windows account and
+computer it came from, and the time: sign-ins (including wrong passwords),
+every invoice, collection, bill, payment and journal entry, voids,
+cancellations and reversals, changes to clients, suppliers, accounts and
+settings (with the values before and after), printouts, exports, e-mails and
+backups. Filter it by user, action or record, and print or export it.
 
-The **audit trail** records every action with the user, the Windows account
-and computer it came from, and the time: sign-ins (including failed and
-refused ones), every invoice, collection, bill, payment and journal entry,
-voids, cancellations and reversals, changes to clients, suppliers, accounts,
-settings and users (with the values before and after), printouts, exports,
-e-mails, backups, and attempts to do something the user's role doesn't allow.
-Filter it by user, action or record; each invoice, journal entry, supplier and
-account has its own history.
+Five wrong passwords in a row lock that account for 15 minutes. After 30
+minutes without activity the user is signed out. **My account** (click your
+name) changes the password, lists recent sign-ins, and downloads a backup.
 
 **Deletions:** nothing can be deleted. The database itself refuses to delete
 invoices, documents, clients, suppliers, accounts, users, journal entries or
-audit trail rows. Mistakes are voided, cancelled or reversed, and accounts and
-users are deactivated, so the original always stays on record. Every audit trail
-row is chained by hash to the one before it; **Books & reports** checks the
-chain and shows if any row was changed or removed outside the app.
+history rows. Mistakes are voided, cancelled or reversed, so the original
+always stays on record. Every history row is chained by hash to the one
+before it; **Books & reports** checks the chain and shows if any row was
+changed or removed outside the app.
 
 **Backups:** a copy of the database is saved in `data\backups` once a day
-(the last 30 are kept). An administrator can also download one from **Users**.
+(the last 30 are kept), and **My account** downloads one on demand.
 
 ## Settings (`.env`)
 
@@ -243,7 +236,7 @@ chain and shows if any row was changed or removed outside the app.
 ## Back up
 
 Everything is in `data\einvoice.db`. The app keeps a daily copy in
-`data\backups` and an administrator can download one from **Users**; you can
+`data\backups` and **My account** downloads one; you can
 also copy the file while the app is closed.
 
 ## Development
