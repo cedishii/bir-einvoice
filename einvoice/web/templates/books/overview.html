@@ -32,8 +32,8 @@
   <ul class="report-list">
     {% for key in ["SJ", "PJ", "CRJ", "CDJ", "GJ", "gl", "ar", "ap", "tb", "audit"] %}
     <li><a href="{{ url_for('books.report', key=key, **{'from': start, 'to': end}) }}">
-      {{ reports[key] }}
-      <small>{% if key == "tb" %}as of {{ end }}{% elif key in counts %}{{ counts[key] }} entries in total{% else %}&nbsp;{% endif %}</small></a></li>
+      <span>{{ reports[key] }}</span>
+      <small>{% if key == "tb" %}As of {{ end }}{% elif key in counts %}{{ counts[key] }} entries in total{% else %}{{ {"gl": "Every account, with running balances", "ar": "Receivables per client", "ap": "Payables per supplier", "audit": "Every posting, change and printout"}[key] }}{% endif %}</small></a></li>
     {% endfor %}
   </ul>
 </section>

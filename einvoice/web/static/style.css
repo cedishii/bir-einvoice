@@ -213,8 +213,11 @@ tr.cancelled td { color: #999; }
 .filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
 .filters .field { margin: 0; min-width: 150px; }
 .filters .quick { display: flex; gap: 10px; align-items: center; padding-bottom: 10px; }
-.report-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
-.report-list a { display: block; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; text-decoration: none; color: var(--ink); background: #fff; }
+.report-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); grid-auto-rows: 1fr;
+                gap: 10px; margin: 0; padding: 0; list-style: none; }
+.report-list li { display: flex; }
+.report-list a { flex: 1; display: flex; flex-direction: column; justify-content: space-between; gap: 4px;
+                 padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; text-decoration: none; color: var(--ink); background: #fff; }
 .report-list a:hover { border-color: var(--accent); }
 .report-list small { display: block; color: var(--muted); }
 .ok { color: var(--ok); font-weight: 600; }
