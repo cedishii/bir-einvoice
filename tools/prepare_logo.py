@@ -1,47 +1,58 @@
-"""Render assets/micronet_logo.pdf (the company's original artwork) to
-assets/logo.png, trimmed to the artwork, for the app and the printed invoice.
+"""Make assets/logo.png and assets/app.ico from the company logo image
+(assets/micronet_logo.jpg).
 
-Usage (one-off, needs PyMuPDF which is not an app dependency):
-    .venv\\Scripts\\pip install pymupdf
+The logo is trimmed to the artwork (white margins and any thin frame around
+the image edge are cut off), keeps a little white around it, and is saved
+at a width that prints sharply on the invoice. The app icon is the logo on a
+white square.
+
+Usage:
     .venv\\Scripts\\python tools\\prepare_logo.py
 """
 from pathlib import Path
 
-import pymupdf
+from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
-SOURCE = ROOT / "assets" / "micronet_logo.pdf"
-TARGET = ROOT / "assets" / "logo.png"
-WIDTH_PX = 900  # ~3 inches at 300 dpi, plenty for the printed header
-MARGIN_PT = 6   # white kept around the artwork
+SOURCE = ROOT / "assets" / "micronet_logo.jpg"
+LOGO = ROOT / "assets" / "logo.png"
+ICON = ROOT / "assets" / "app.ico"
+WIDTH_PX = 900      # ~3 inches at 300 dpi, plenty for the printed header
+EDGE_PX = 4         # a frame line this close to the image edge is not artwork
+MARGIN_PX = 12      # white kept around the artwork
+ICON_SIZES = [(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)]
 
 
-def artwork_rect(page: pymupdf.Page) -> pymupdf.Rect:
-    """Page-space rectangle around everything that isn't white."""
-    preview = page.get_pixmap(dpi=36, alpha=False)
-    w, h, n, s = preview.width, preview.height, preview.n, preview.stride
-    data = preview.samples
-    xs, ys = [], []
-    for y in range(h):
-        for x in range(w):
-            i = y * s + x * n
-            if min(data[i:i + 3]) < 240:
-                xs.append(x)
-                ys.append(y)
-    scale = page.rect.width / w
-    return pymupdf.Rect(
-        min(xs) * scale - MARGIN_PT, min(ys) * scale - MARGIN_PT,
-        (max(xs) + 1) * scale + MARGIN_PT, (max(ys) + 1) * scale + MARGIN_PT,
-    ) & page.rect
+def artwork_box(img: Image.Image) -> tuple[int, int, int, int]:
+    """Box around everything that isn't (near) white, ignoring the outer edge."""
+    gray = img.convert("L")
+    w, h = gray.size
+    inner = gray.crop((EDGE_PX, EDGE_PX, w - EDGE_PX, h - EDGE_PX))
+    mask = inner.point(lambda v: 255 if v < 235 else 0)
+    left, top, right, bottom = mask.getbbox()
+    return (max(0, left + EDGE_PX - MARGIN_PX), max(0, top + EDGE_PX - MARGIN_PX),
+            min(w, right + EDGE_PX + MARGIN_PX), min(h, bottom + EDGE_PX + MARGIN_PX))
+
+
+def make_logo() -> Image.Image:
+    img = Image.open(SOURCE).convert("RGB")
+    logo = img.crop(artwork_box(img))
+    logo = logo.resize((WIDTH_PX, round(logo.height * WIDTH_PX / logo.width)), Image.LANCZOS)
+    logo.save(LOGO, optimize=True)
+    return logo
+
+
+def make_icon(logo: Image.Image) -> None:
+    side = max(logo.size)
+    square = Image.new("RGB", (side, side), (255, 255, 255))
+    square.paste(logo, ((side - logo.width) // 2, (side - logo.height) // 2))
+    square.save(ICON, sizes=ICON_SIZES)
 
 
 def main() -> None:
-    page = pymupdf.open(SOURCE)[0]
-    clip = artwork_rect(page)
-    zoom = WIDTH_PX / clip.width
-    pix = page.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom), clip=clip, alpha=False)
-    pix.save(TARGET)
-    print(f"wrote {TARGET} ({pix.width}x{pix.height})")
+    logo = make_logo()
+    make_icon(logo)
+    print(f"wrote {LOGO} ({logo.width}x{logo.height}) and {ICON}")
 
 
 if __name__ == "__main__":

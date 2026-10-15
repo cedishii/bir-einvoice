@@ -102,3 +102,12 @@ def test_amount_checks():
 def test_form_has_amount_column_and_total(client):
     page = client.get("/invoices/new").get_data(as_text=True)
     assert page.count('<input name="amount_jpy[]"') == 2 and 'id="lines-total"' in page
+
+
+def test_drafts_survive_restarting_the_app(config):
+    first = sign_in(create_app(config))
+    r = first.post("/invoices/review", data=form(buyer_name="KEPT AFTER RESTART"))
+    draft = r.location.rsplit("/", 1)[1]
+    again = sign_in(create_app(config))  # the app was closed and opened again
+    assert 'value="KEPT AFTER RESTART"' in again.get(f"/invoices/new?draft={draft}").get_data(as_text=True)
+    assert "Issue invoice No." in again.get(f"/invoices/review/{draft}").get_data(as_text=True)

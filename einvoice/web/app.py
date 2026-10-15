@@ -24,6 +24,7 @@ from ..books import ledger, postings
 from ..books.ledger import BooksError
 from ..pdf.service_invoice import render as render_pdf
 from ..storage.db import connect
+from ..storage import drafts
 from ..storage.repository import Repository
 from . import auth_views, books
 
@@ -45,13 +46,6 @@ def create_app(config: Config | None = None, transport: TransportSettings | None
     send_mail = email_sender if email_sender is not None else emailer.smtp_send
     eis_clients: list[EisClient] = []  # one client, so the login session is reused
     app.secret_key = secrets.token_hex(16)
-    # Draft id already used to issue an invoice -> control number, so a double
-    # click or a browser "resubmit" never issues twice.
-    issued_tokens: dict[str, str] = {}
-    # Invoices being filled in, by draft id. The review page has its own
-    # address (/invoices/review/<draft>) and the form can be reopened from a
-    # draft, so Back always works and never asks to resubmit a form.
-    drafts: dict[str, dict] = {}
 
     def cfg() -> Config:
         return app.config["EINVOICE"]
@@ -126,9 +120,7 @@ def create_app(config: Config | None = None, transport: TransportSettings | None
         draft_id = request.form.get("draft", "")
         if not re.fullmatch(r"[0-9a-f]{32}", draft_id):
             draft_id = secrets.token_hex(16)
-        drafts[draft_id] = data
-        while len(drafts) > 200:  # only recent drafts are kept
-            drafts.pop(next(iter(drafts)))
+        drafts.save(repo().conn, draft_id, data)
         return draft_id
 
     def eis_states() -> dict[int, str]:
@@ -144,12 +136,12 @@ def create_app(config: Config | None = None, transport: TransportSettings | None
     @app.get("/invoices/new")
     def new_invoice():
         draft_id = request.args.get("draft", "")
-        if draft_id in drafts:
-            if draft_id in issued_tokens:
-                flash(f"That invoice was already issued as No. {issued_tokens[draft_id]}. "
-                      "This is a new one.")
-            else:
-                return render_form(drafts[draft_id], draft_id=draft_id)
+        issued = drafts.issued_as(repo().conn, draft_id)
+        saved = drafts.get(repo().conn, draft_id)
+        if issued:
+            flash(f"That invoice was already issued as No. {issued}. This is a new one.")
+        elif saved is not None:
+            return render_form(saved, draft_id=draft_id)
         today = today_ph().isoformat()
         data = {k: "" for k in FORM_FIELDS} | {"issue_date": today, "rate_date": today}
         last = repo().list()
@@ -180,7 +172,7 @@ def create_app(config: Config | None = None, transport: TransportSettings | None
 
     @app.get("/invoices/review/<draft>")
     def show_review(draft):
-        data = drafts.get(draft)
+        data = drafts.get(repo().conn, draft)
         if data is None:
             flash("That draft is no longer open. Please fill in the invoice again.", "error")
             return redirect(url_for("new_invoice"))
@@ -192,13 +184,15 @@ def create_app(config: Config | None = None, transport: TransportSettings | None
         problems = eis_export.precheck(inv, cfg(), next_no)
         return render_template("review.html", inv=inv, data=data, rows=list(
             zip_longest(*(data[k + "[]"] for k in LINE_FIELDS), fillvalue="")), token=draft,
-            next_no=next_no, problems=problems, issued_as=issued_tokens.get(draft))
+            next_no=next_no, problems=problems,
+            issued_as=drafts.issued_as(repo().conn, draft))
 
     @app.post("/invoices/issue")
     def issue_invoice():
         token = request.form.get("token", "")
-        if token in issued_tokens:
-            return redirect(url_for("show_invoice", control_no=issued_tokens[token]))
+        issued = drafts.issued_as(repo().conn, token) if token else None
+        if issued:
+            return redirect(url_for("show_invoice", control_no=issued))
         data = form_data()
         try:
             inv = invoice_from_form(data)
@@ -214,7 +208,8 @@ def create_app(config: Config | None = None, transport: TransportSettings | None
             inv = repo().issue(inv)
         except BooksError as e:  # e.g. the invoice date is in a closed period
             return render_form(data, {"books": str(e)}, status=422, draft_id=token)
-        issued_tokens[token] = inv.control_no
+        if token:
+            drafts.mark_issued(repo().conn, token, inv.control_no)
         flash(f"Service Invoice No. {inv.control_no} issued.")
         if email_settings().auto_send:
             email_invoice(inv, automatic=True)

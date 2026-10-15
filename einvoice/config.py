@@ -28,7 +28,7 @@ class Seller:
     business_nm: str = "MICRONET SOFTWARE MANILA, INC."
     reg_addr: str = ("Unit 8A&B Cypress Gardens, 112 V.A. Rufino St., "
                      "Legaspi Village, Makati City")
-    tel: str = "02-8812-8174"
+    tel: str = "02-8330-8924"
     email: str = ""
 
     @property

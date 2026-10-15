@@ -21,7 +21,7 @@ def test_invoice_shows_required_details(repo, config):
     text = _text(render(_issued(repo), config))
     for expected in [
         "SERVICE INVOICE", "No. 0001773", "November 25, 2024",
-        "MICRONET SOFTWARE MANILA, INC.", "002-372-466-00000", "02-8812-8174",
+        "MICRONET SOFTWARE MANILA, INC.", "002-372-466-00000", "02-8330-8924",
         "Legaspi Village, Makati City",
         "MICRONET CO. LTD.", "SAPPORO, JAPAN", "Graphic Design",
         "IT services rendered for Nov 2024",

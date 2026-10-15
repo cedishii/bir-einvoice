@@ -15,6 +15,7 @@ from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 from reportlab.lib.pagesizes import LETTER
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import inch
+from reportlab.lib.utils import ImageReader
 from reportlab.platypus import (Image, KeepTogether, Paragraph, SimpleDocTemplate,
                                 Spacer, Table, TableStyle)
 
@@ -75,7 +76,8 @@ def _money(v: Decimal) -> str:
 def _header(inv: Invoice, cfg: Config):
     seller = cfg.seller
     logo_w = 1.55 * inch
-    logo = Image(str(LOGO_PATH), width=logo_w, height=logo_w * 656 / 901)
+    img_w, img_h = ImageReader(str(LOGO_PATH)).getSize()
+    logo = Image(str(LOGO_PATH), width=logo_w, height=logo_w * img_h / img_w)
     company = [
         Paragraph(_esc(seller.reg_nm), S_CO),
         Spacer(0, 3),

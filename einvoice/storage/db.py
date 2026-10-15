@@ -338,6 +338,16 @@ MIGRATIONS = [
     # the income-tax exclusions, and the starter chart. The company's own
     # chart is applied from a local file (books/chart.py).
     chart_sql(),
+    # 10: invoices being filled in (see storage/drafts.py), so going Back from
+    # the review page keeps what was typed, even across a restart.
+    """
+    CREATE TABLE invoice_drafts (
+        id          TEXT PRIMARY KEY,
+        data        TEXT NOT NULL,
+        issued_no   TEXT NOT NULL DEFAULT '',
+        updated_at  TEXT NOT NULL
+    );
+    """,
 ]
 
 

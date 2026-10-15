@@ -147,7 +147,8 @@ VAT 0.00, Total. Clearly marked "ZERO-RATED SALE". Layout follows
 1. Files supplied: `docs/sample-einvoice.json`, `docs/old-receipt.jpg` (kept
    locally only, gitignored: it is a real signed receipt),
    `docs/reference-invoice-ui.jpg` (a third-party invoice screen, for ideas) and
-   `assets/micronet_logo.pdf`. `assets/logo.png` is rendered from the PDF by
+   `assets/micronet_logo.jpg` (the new logo, 2026-10-15). `assets/logo.png` and
+   `assets/app.ico` are made from it by
    `tools/prepare_logo.py`.
 2. **ConvRate keeps the full rate** (up to 6 decimals), on the invoice and in
    the JSON. Only PHP amounts are rounded to 2 decimals.
