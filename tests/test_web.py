@@ -2,13 +2,14 @@ import pytest
 
 from einvoice.web.app import create_app
 from tests.test_form import form
+from tests.conftest import sign_in
 
 
 @pytest.fixture
 def client(config):
     app = create_app(config)
     app.testing = True
-    return app.test_client()
+    return sign_in(app)
 
 
 def test_list_starts_empty(client):
@@ -90,7 +91,7 @@ def test_test_export_page_and_download(client):
 def test_real_export_flow(config):
     from einvoice.web.app import create_app
     app = create_app(config.with_(eis_cert_no="20ABC123", ptu_num="PTU-0001"))
-    c = app.test_client()
+    c = sign_in(app)
     c.post("/invoices/issue", data=form() | {"token": "t5"})
     assert "Prototype mode" not in c.get("/").get_data(as_text=True)
     r = c.post("/invoices/0001773/export")
@@ -125,7 +126,7 @@ def test_send_and_check_through_the_app(config, tmp_path):
                                  password="p", key_id="K", bir_public_key_file=str(tmp_path / "bir.pem"),
                                  private_key_file=str(tmp_path / "tp.pem"))
     app = create_app(config.with_(eis_cert_no=CERT, ptu_num="PTU-1"), settings, http=bir)
-    c = app.test_client()
+    c = sign_in(app)
 
     assert "All settings present" in c.get("/bir").get_data(as_text=True)
     c.post("/bir/login")
@@ -153,7 +154,7 @@ def test_send_and_check_through_the_app(config, tmp_path):
 
 def test_send_disabled_without_settings(config):
     from einvoice.web.app import create_app
-    c = create_app(config.with_(eis_cert_no="20ABC123", ptu_num="PTU-1")).test_client()
+    c = sign_in(create_app(config.with_(eis_cert_no="20ABC123", ptu_num="PTU-1")))
     c.post("/invoices/issue", data=form() | {"token": "b3"})
     c.post("/invoices/0001773/export")
     r = c.post("/invoices/0001773/send", follow_redirects=True)

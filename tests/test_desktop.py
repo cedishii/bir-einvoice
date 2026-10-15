@@ -1,5 +1,6 @@
 from einvoice import desktop
 from einvoice.desktop import Presence
+from tests.conftest import sign_in
 
 
 class Clock:
@@ -81,14 +82,14 @@ def test_no_window_ever_opened_stops_eventually():
 
 def test_routes_and_script_only_in_desktop_mode(config):
     from einvoice.web.app import create_app
-    plain = create_app(config).test_client()
+    plain = sign_in(create_app(config))
     assert "/_window/ping" not in plain.get("/").get_data(as_text=True)
     assert plain.post("/_window/ping").status_code in (404, 405)
 
     app = create_app(config)
     p, clock, stops = make()
     p.install(app)
-    c = app.test_client()
+    c = sign_in(app)
     assert "/_window/ping" in c.get("/").get_data(as_text=True)
     assert c.post("/_window/ping", data={"id": "w1"}).status_code == 204
     assert "w1" in p.last_seen

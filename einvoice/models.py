@@ -82,6 +82,8 @@ class Invoice:
     void_reason: str = ""
     created_at: str = ""
     voided_at: str = ""
+    issued_by: str = ""       # app user who issued / voided it (audit trail)
+    voided_by: str = ""
     id: int | None = None
 
     # Totals (filled by compute)

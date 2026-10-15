@@ -7,7 +7,7 @@ import string
 from datetime import date, datetime
 from decimal import Decimal
 
-from ..books import postings
+from ..books import ledger, postings
 from ..models import PH_TZ, Invoice, InvoiceLine, today_ph
 from . import control_numbers
 
@@ -63,6 +63,13 @@ class Repository:
                     (invoice.id, no, line.item_name, line.description, str(line.qty),
                      line.unit, str(line.unit_cost_jpy), str(line.amount_jpy),
                      str(line.unit_cost_php), str(line.sales_php)))
+            invoice.issued_by = ledger.current_user()
+            conn.execute("UPDATE invoices SET issued_by = ? WHERE id = ?",
+                         (invoice.issued_by, invoice.id))
+            ledger.audit(conn, "issue invoice",
+                         f"{invoice.buyer_name}, {invoice.sale_type}, "
+                         f"PHP {invoice.total_due_php:,.2f} (JPY {invoice.total_due_jpy:,.2f} "
+                         f"at {invoice.rate})", entity="invoice", entity_id=invoice.control_no)
             postings.post_invoice(conn, invoice)  # Sales Journal
             conn.execute("COMMIT")
         except Exception:
@@ -95,13 +102,16 @@ class Repository:
                              "memos / cancellations) are not built yet.")
         with postings.transaction(self.conn):
             cur = self.conn.execute(
-                """UPDATE invoices SET status = 'void', void_reason = ?, voided_at = ?
+                """UPDATE invoices SET status = 'void', void_reason = ?, voided_at = ?,
+                       voided_by = ?
                    WHERE control_no = ? AND status = 'issued'""",
-                (reason, _now(), control_no))
+                (reason, _now(), ledger.current_user(), control_no))
             if cur.rowcount != 1:
                 raise ValueError(f"Invoice {control_no} is not an issued invoice.")
             invoice_id = self.conn.execute("SELECT id FROM invoices WHERE control_no = ?",
                                            (control_no,)).fetchone()["id"]
+            ledger.audit(self.conn, "void invoice", reason, entity="invoice",
+                         entity_id=control_no, changes={"status": ["issued", "void"]})
             postings.post_invoice_void(self.conn, invoice_id, reason, on=today_ph())
         return self.get(control_no)
 
@@ -147,4 +157,5 @@ def _invoice_from_rows(row: sqlite3.Row, line_rows: list[sqlite3.Row]) -> Invoic
         total_jpy=Decimal(row["total_jpy"]), total_php=Decimal(row["total_php"]),
         eis_key=row["eis_key"], void_reason=row["void_reason"],
         created_at=row["created_at"], voided_at=row["voided_at"],
+        issued_by=row["issued_by"], voided_by=row["voided_by"],
     )

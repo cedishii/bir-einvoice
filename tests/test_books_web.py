@@ -5,13 +5,14 @@ import pytest
 
 from einvoice.web.app import create_app
 from tests.test_form import form
+from tests.conftest import sign_in
 
 
 @pytest.fixture
 def client(config):
     app = create_app(config)
     app.testing = True
-    return app.test_client()
+    return sign_in(app)
 
 
 def page(client, url):

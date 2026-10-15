@@ -1,0 +1,13 @@
+{% extends "auth/_bare.html" %}
+{% block content %}
+<h1>Sign in</h1>
+<p class="muted">Micronet e-Invoice and books of accounts. Everything you enter is recorded under your name.</p>
+<form method="post">
+  <label class="field"><span>Username</span>
+    <input name="username" value="{{ username }}" autocomplete="username" autocapitalize="none" autofocus required></label>
+  <label class="field"><span>Password</span>
+    <input type="password" name="password" autocomplete="current-password" required></label>
+  <button class="button" type="submit">Sign in</button>
+</form>
+<p class="muted"><small>Forgot your password? Ask an administrator to set a temporary one.</small></p>
+{% endblock %}

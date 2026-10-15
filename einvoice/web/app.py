@@ -7,7 +7,7 @@ from datetime import date
 from flask import (Flask, Response, abort, flash, g, redirect, render_template,
                    request, send_file, url_for)
 
-from .. import emailer, money
+from .. import backup, emailer, money
 from ..config import LOGO_PATH, Config, load_config
 from ..models import (DEFAULT_ITEM_NAME, DEFAULT_UNIT, MAX_LEN, SALE_TYPES, FormErrors,
                       invoice_from_form, today_ph)
@@ -23,7 +23,7 @@ from ..books.ledger import BooksError
 from ..pdf.service_invoice import render as render_pdf
 from ..storage.db import connect
 from ..storage.repository import Repository
-from . import books
+from . import auth_views, books
 
 LINE_FIELDS = ["item_name", "description", "qty", "unit", "unit_cost_jpy"]
 FORM_FIELDS = ["issue_date", "buyer_name", "buyer_tin", "buyer_address",
@@ -58,6 +58,11 @@ def create_app(config: Config | None = None, transport: TransportSettings | None
 
     app.extensions["einvoice"] = {"repo": repo, "cfg": cfg}
     app.register_blueprint(books.bp)
+    auth_views.install(app)  # logins, roles, and who did what
+    try:
+        backup.daily(cfg())
+    except OSError:
+        pass  # a failed automatic backup must not stop the app
 
     @app.teardown_appcontext
     def close_db(_exc):
@@ -80,8 +85,12 @@ def create_app(config: Config | None = None, transport: TransportSettings | None
         try:
             result = emailer.send_invoice(repo().conn, inv, cfg(), email_settings(),
                                           automatic=automatic, sender=send_mail)
+            ledger.audit(repo().conn, "e-mail invoice", result.message, entity="invoice",
+                         entity_id=inv.control_no)
             flash(result.message)
         except emailer.EmailError as e:
+            ledger.audit(repo().conn, "e-mail invoice", f"not sent: {e}", entity="invoice",
+                         entity_id=inv.control_no)
             flash(("Automatic e-mail not sent: " if automatic else "") + str(e), "error")
 
     def can_send() -> bool:
@@ -188,8 +197,9 @@ def create_app(config: Config | None = None, transport: TransportSettings | None
         exported = eis_export.existing_export(repo().conn, cfg(), inv)
         bir = eis_service.status_of(repo().conn, exported.eis_unique_id) if exported else None
         books_entry = ledger.entry_for(repo().conn, "invoice", inv.id)
+        history = ledger.history(repo().conn, "invoice", inv.control_no)
         return render_template("detail.html", inv=inv, exported=exported, bir=bir,
-                               books_entry=books_entry,
+                               books_entry=books_entry, history=history,
                                books_reversal=books_entry and ledger.reversal_of(repo().conn, books_entry["id"]),
                                balance=postings.invoice_balance(repo().conn, inv.id),
                                emails=emailer.history(repo().conn, inv),
@@ -212,6 +222,8 @@ def create_app(config: Config | None = None, transport: TransportSettings | None
         except ExportRefused as e:
             return render_detail(inv, e.issues, status=422)
         if not result.already_exported:
+            ledger.audit(repo().conn, "EIS export", result.path.name, entity="invoice",
+                         entity_id=control_no)
             flash(f"e-Invoice JSON exported: {result.path.name}")
         return redirect(url_for("show_invoice", control_no=control_no))
 
@@ -246,6 +258,9 @@ def create_app(config: Config | None = None, transport: TransportSettings | None
         pdf = render_pdf(inv, cfg())
         name = f"Service-Invoice-{inv.control_no}.pdf"
         disposition = "attachment" if request.args.get("download") else "inline"
+        ledger.audit(repo().conn, "print invoice",
+                     "PDF downloaded" if disposition == "attachment" else "PDF opened",
+                     entity="invoice", entity_id=control_no)
         return Response(pdf, mimetype="application/pdf",
                         headers={"Content-Disposition": f'{disposition}; filename="{name}"'})
 
@@ -291,6 +306,8 @@ def create_app(config: Config | None = None, transport: TransportSettings | None
 
         def go():
             [sid] = eis_service.send(repo().conn, cfg(), eis_client(), [done.eis_unique_id])
+            ledger.audit(repo().conn, "send to BIR", f"submitId {sid}", entity="invoice",
+                         entity_id=control_no)
             return f"Sent to BIR (submitId {sid}). Use \"Check result\" in a moment."
         return bir_action(go, back)
 
@@ -333,6 +350,9 @@ def create_app(config: Config | None = None, transport: TransportSettings | None
             if not ids:
                 return "Nothing to send."
             sids = eis_service.send(repo().conn, cfg(), eis_client(), ids)
+            ledger.audit(repo().conn, "send to BIR",
+                         f"{len(ids)} e-invoice(s), submitId(s) {', '.join(sids)}",
+                         entity="bir")
             return f"Sent {len(ids)} e-invoice(s) in {len(sids)} submission(s)."
         return bir_action(go, url_for("bir_page"))
 

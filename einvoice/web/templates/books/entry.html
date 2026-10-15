@@ -38,7 +38,9 @@
   <p class="hash">Hash {{ e.hash }}</p>
 </section>
 
-{% if e.source_type in ("manual", "opening") and not reversal %}
+{% include "_history.html" %}
+
+{% if e.source_type in ("manual", "opening") and not reversal and can('approve') %}
 <details class="card danger">
   <summary>Reverse this entry</summary>
   <p class="muted">Posts the mirror image in the General Journal, dated today. The original stays in the books.</p>

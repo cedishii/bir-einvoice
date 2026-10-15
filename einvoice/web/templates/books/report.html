@@ -2,10 +2,11 @@
 {% block title %}{{ r.title }}{% endblock %}
 {% block content %}
 {% set args = {"from": start, "to": end, "party": party or "", "account": account or ""} %}
+{% if audit_filters %}{% set args = dict(args, user=audit_filters.user, action=audit_filters.action, entity=audit_filters.entity, id=audit_filters.id) %}{% endif %}
 <div class="heading with-actions">
   <div>
     <h1>{{ r.title }}</h1>
-    <p class="muted">{{ r.period }} · Amounts in PHP</p>
+    <p class="muted">{{ r.period }}{% if key != "audit" %} · Amounts in PHP{% endif %}</p>
   </div>
   <div class="actions">
     <a href="{{ url_for('books.overview') }}">&larr; Books</a>
@@ -25,6 +26,18 @@
     <select name="account"><option value="">All accounts</option>
       {% for a in accounts %}<option value="{{ a.code }}" {{ 'selected' if account == a.code }}>{{ a.code }} {{ a.name }}</option>{% endfor %}
     </select></label>
+  {% endif %}
+  {% if audit_filters %}
+  <label class="field"><span>User</span>
+    <select name="user"><option value="">Everyone</option>
+      {% for u in audit_filters.users %}<option {{ 'selected' if audit_filters.user == u }}>{{ u }}</option>{% endfor %}</select></label>
+  <label class="field"><span>Action</span>
+    <select name="action"><option value="">All actions</option>
+      {% for a in audit_filters.actions %}<option {{ 'selected' if audit_filters.action == a }}>{{ a }}</option>{% endfor %}</select></label>
+  <label class="field"><span>Record</span>
+    <select name="entity"><option value="">All records</option>
+      {% for e, label in audit_filters.entities %}<option value="{{ e }}" {{ 'selected' if audit_filters.entity == e }}>{{ label }}</option>{% endfor %}</select></label>
+  {% if audit_filters.id %}<input type="hidden" name="id" value="{{ audit_filters.id }}">{% endif %}
   {% endif %}
   {% if parties %}
   <label class="field"><span>{{ "Client" if key in ("ar", "wt-received") else "Supplier" }}</span>

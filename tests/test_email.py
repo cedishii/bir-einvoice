@@ -6,6 +6,7 @@ from einvoice import emailer
 from einvoice.emailer import EmailError, EmailSettings
 from tests.conftest import make_invoice
 from tests.test_form import form
+from tests.conftest import sign_in
 
 SETTINGS = EmailSettings(host="smtp.example.com", from_addr="billing@micronet.example",
                          cc=("accounting@micronet.example",), test_to="me@micronet.example")
@@ -109,7 +110,7 @@ def test_email_goes_into_the_bir_json(repo, config):
 
 def app_client(config, settings, out):
     from einvoice.web.app import create_app
-    return create_app(config, email=settings, email_sender=out).test_client()
+    return sign_in(create_app(config, email=settings, email_sender=out))
 
 
 def test_auto_send_on_issue(config):

@@ -80,7 +80,8 @@ def report_pdf(report: Report, cfg: Config) -> bytes:
         c.setFont("Helvetica-Bold", 12)
         c.drawRightString(w - MARGIN, top - 10, report.title)
         c.setFont("Helvetica", 8.5)
-        c.drawRightString(w - MARGIN, top - 22, report.period + " · Amounts in PHP")
+        c.drawRightString(w - MARGIN, top - 22,
+                          report.period + ("" if report.key == "audit" else " · Amounts in PHP"))
         c.setStrokeColor(LINE)
         c.line(MARGIN, top - 40, w - MARGIN, top - 40)
         c.setFont("Helvetica", 7)
@@ -219,5 +220,6 @@ def year_archive(conn: sqlite3.Connection, cfg: Config, year: int) -> bytes:
                 z.writestr(name, content)
                 lines.append(f"{hashlib.sha256(content).hexdigest()}  {name}")
         z.writestr("MANIFEST.txt", "\r\n".join(lines) + "\r\n")
-    ledger.audit(conn, "export", f"year-end archive of the books for {year}")
+    ledger.audit(conn, "export", f"year-end archive of the books for {year}", entity="report",
+                 entity_id=f"archive-{year}")
     return buf.getvalue()

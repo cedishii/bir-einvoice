@@ -86,6 +86,7 @@
         <small>2551Q, for non-VAT taxpayers</small></label>
     </div>
   </fieldset>
-  <div class="actions"><button class="button" type="submit">Save tax settings</button></div>
+  {% if can('approve') %}<div class="actions"><button class="button" type="submit">Save tax settings</button></div>
+  {% else %}<p class="muted">Only an accountant or administrator can change these.</p>{% endif %}
 </form>
 {% endblock %}

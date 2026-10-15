@@ -80,7 +80,8 @@ def save_tax_settings(conn: sqlite3.Connection, new: dict[str, str]) -> None:
     for key, value in changes.items():
         conn.execute("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT (key) "
                      "DO UPDATE SET value = excluded.value", (f"tax.{key}", value))
-        ledger.audit(conn, "tax settings", f"{key}: {current[key]} -> {value}")
+        ledger.audit(conn, "tax settings", key, entity="settings", entity_id=f"tax.{key}",
+                     changes={key: [current[key], value]})
 
 
 def _pct(settings: dict, key: str) -> Decimal:

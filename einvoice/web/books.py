@@ -107,7 +107,9 @@ def overview():
                            (k,)).fetchone()[0] for k in ledger.BOOKS}
     return render_template("books/overview.html", reports=REPORTS, quarterly=QUARTERLY,
                            start=start, end=end, counts=counts,
-                           problems=ledger.verify(c), closed=ledger.closed_through(c),
+                           problems=ledger.verify(c), audit_problems=ledger.verify_audit(c),
+                           audit_rows=c.execute("SELECT COUNT(*) FROM audit_log").fetchone()[0],
+                           closed=ledger.closed_through(c),
                            quarters=_quarters(today.year), year=today.year,
                            years=_years(c))
 
@@ -134,11 +136,12 @@ def report(key):
     fmt = request.args.get("format")
     stem = f"{printing.file_stem(r)}_{start.isoformat() if r.start else ''}_{end.isoformat()}"
     if fmt == "pdf":
-        ledger.audit(c, "print", f"{r.title}, {r.period}")
+        ledger.audit(c, "print", f"{r.title}, {r.period}", entity="report", entity_id=key)
         return _download(printing.report_pdf(r, cfg()), f"{stem}.pdf", "application/pdf",
                          inline=True)
     if fmt == "csv":
-        ledger.audit(c, "export", f"{r.title}, {r.period} (CSV)")
+        ledger.audit(c, "export", f"{r.title}, {r.period} (CSV)", entity="report",
+                     entity_id=key)
         return _download(printing.report_csv(r, cfg()), f"{stem}.csv", "text/csv")
     parties = []
     if key in ("ar", "wt-received"):
@@ -149,7 +152,16 @@ def report(key):
                            party=party, account=account, parties=parties,
                            accounts=ledger.accounts(c), quarterly=key in QUARTERLY,
                            quarters=_quarters(start.year), cell=printing.cell_text,
-                           as_of=key == "tb")
+                           as_of=key == "tb", audit_filters=_audit_filters(c) if key == "audit" else None)
+
+
+def _audit_filters(c) -> dict:
+    distinct = lambda col: [r[0] for r in c.execute(  # noqa: E731
+        f"SELECT DISTINCT {col} FROM audit_log WHERE {col} != '' ORDER BY {col}")]
+    return {"users": distinct("user"), "actions": distinct("action"),
+            "entities": [(e, reports.ENTITY_NAMES.get(e, e)) for e in distinct("entity")],
+            "user": request.args.get("user", ""), "action": request.args.get("action", ""),
+            "entity": request.args.get("entity", ""), "id": request.args.get("id", "")}
 
 
 def _build(c, key, start, end, party, account):
@@ -169,7 +181,10 @@ def _build(c, key, start, end, party, account):
         return reports.slp(c, start, end)
     if key.startswith("wt-"):
         return reports.withholding(c, key[3:], start, end, party)
-    return reports.audit_log(c, start, end)
+    return reports.audit_log(c, start, end, user=request.args.get("user") or None,
+                             action=request.args.get("action") or None,
+                             entity=request.args.get("entity") or None,
+                             entity_id=request.args.get("id") or None)
 
 
 @bp.get("/books/archive")
@@ -210,6 +225,9 @@ def show_entry(entry_id):
     lines = ledger.entry_lines(c, entry_id)
     return render_template("books/entry.html", e=e, lines=lines, invoice_no=invoice_no,
                            total=sum((Decimal(l["debit"]) for l in lines), money.ZERO),
+                           history=ledger.history(c, "journal", f"{e['book']}-{e['entry_no']}")
+                           + (ledger.history(c, e["source_type"], e["source_id"])
+                              if e["source_type"] in ("collection", "bill", "payment") else []),
                            party=names.get((e["party_type"], e["party_id"]), ""),
                            reversal=ledger.reversal_of(c, entry_id),
                            reverses=ledger.entry(c, e["source_id"]) if e["source_type"] == "reversal" else None,
@@ -514,7 +532,8 @@ def add_account():
         with postings.transaction(c):
             c.execute("INSERT INTO accounts (code, name, type, is_cash, is_cost) VALUES (?,?,?,?,?)",
                       (code, name, kind, is_cash, is_cost))
-            ledger.audit(c, "add account", f"{code} {name} ({kind})")
+            ledger.audit(c, "add account", f"{code} {name} ({kind})", entity="account",
+                         entity_id=code)
         flash(f"Account {code} {name} added.")
     except BooksError as e:
         flash(str(e), "error")
@@ -536,8 +555,9 @@ def update_account(code):
     with postings.transaction(c):
         c.execute("UPDATE accounts SET name = ?, active = ?, is_cost = ? WHERE code = ?",
                   (name, active, is_cost, code))
-        ledger.audit(c, "change account", f"{code}: name '{a['name']}' -> '{name}', "
-                     f"active {a['active']} -> {active}, cost of sales {a['is_cost']} -> {is_cost}")
+        ledger.audit(c, "change account", f"{code} {name}", entity="account", entity_id=code,
+                     changes=ledger.changed(dict(a), {"name": name, "active": active,
+                                                      "is_cost": is_cost}))
     flash(f"Account {code} saved.")
     return redirect(url_for("books.accounts"))
 
@@ -564,6 +584,19 @@ def add_supplier():
     flash(f"Supplier {' '.join(data['name'].split())} added.")
     back = request.form.get("next", "")
     return redirect(back if back.startswith("/") else url_for("books.suppliers"))
+
+
+@bp.post("/suppliers/<int:supplier_id>")
+def update_supplier(supplier_id):
+    data = request.form.to_dict()
+    try:
+        tin, branch = parse_tin(data.get("tin", ""))
+        postings.update_supplier(conn(), supplier_id, name=data.get("name", ""), tin=tin,
+                                 branch=branch, address=data.get("address", ""))
+        flash("Supplier saved. The change is in the audit trail.")
+    except ValueError as e:
+        flash(str(e), "error")
+    return redirect(url_for("books.suppliers"))
 
 
 @bp.get("/customers")
@@ -628,11 +661,12 @@ def tax_form(code):
         return redirect(url_for("books.tax_form", code=code, year=year))
     fmt = request.args.get("format")
     if fmt == "pdf":
-        ledger.audit(c, "print", f"{r.title}, {r.period}")
+        ledger.audit(c, "print", f"{r.title}, {r.period}", entity="report", entity_id=r.key)
         return _download(printing.report_pdf(r, cfg()), f"{r.key}.pdf", "application/pdf",
                          inline=True)
     if fmt == "csv":
-        ledger.audit(c, "export", f"{r.title}, {r.period} (CSV)")
+        ledger.audit(c, "export", f"{r.title}, {r.period} (CSV)", entity="report",
+                     entity_id=r.key)
         return _download(printing.report_csv(r, cfg()), f"{r.key}.csv", "text/csv")
     start, end = taxes.period_for(form, year, n)
     due = taxes.next_working_day(form.due(start, end))

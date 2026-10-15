@@ -12,13 +12,14 @@ from einvoice.web.app import create_app
 from tests.conftest import make_invoice
 from tests.test_form import form
 from tests.test_pdf import _text
+from tests.conftest import sign_in
 
 
 @pytest.fixture
 def client(config):
     app = create_app(config)
     app.testing = True
-    return app.test_client()
+    return sign_in(app)
 
 
 def _exported(repo, config, **kw):

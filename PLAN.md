@@ -1,6 +1,6 @@
 # PLAN — BIR e-Invoice prototype (Micronet Software Manila, Inc.)
 
-Status: **approved 2026-10-14.** Phases 1 to 5 built (books of accounts and tax return worksheets on 2026-10-15; sections 7 and 8) (phase 3 requested by the user after phase 2; untested against the real sandbox until enrollment). Answers to the
+Status: **approved 2026-10-14.** Phases 1 to 6 built (books of accounts, tax return worksheets, logins and audit trail on 2026-10-15; sections 7 to 9) (phase 3 requested by the user after phase 2; untested against the real sandbox until enrollment). Answers to the
 open questions are in section 6.
 
 Main reference: `docs/EIS_SPEC_NOTES.md`. Its "Decisions" section is final.
@@ -303,3 +303,29 @@ and non-VAT taxpayers available as options; leave out forms BIR has abolished
   OSD 40% of sales, or 8% over PHP 250,000.
 - 1700: typed-in compensation and tax withheld (not from the books).
 - Not included: NOLCO, government VAT withholding, importations, 1601C (payroll).
+
+## 9. Phase 6 — logins and audit trail (BUILT 2026-10-15)
+
+Asked by Micronet, 2026-10-15: the accounting system's audit trail must track all
+data entries, modifications and deletions; at least 2 logins, room for more, so
+every input can be traced to a person. "If you have more ideas, do it."
+
+- `einvoice/auth.py`: users (migration 8), roles admin / accountant / encoder /
+  auditor, werkzeug password hashes, password rules, lockout after 5 failures
+  for 15 minutes, users deactivated (never deleted), at least one active admin,
+  no changing one's own role.
+- `einvoice/web/auth_views.py`: first-run setup (first admin), login / logout,
+  own password (forced after a temporary one), users page, backup download, and
+  the request gate (login, 30-minute idle timeout, role check per endpoint in
+  NEEDS; refusals are audited). The acting user is a ContextVar in `ledger`, so
+  journal entries and audit rows carry the app user, not the Windows user.
+- Audit trail: entity / entity_id / changes (JSON before-after) / workstation,
+  SHA-256 chain (`ledger.verify_audit`), rows sealed on upgrade, triggers refuse
+  UPDATE / DELETE of sealed rows. Triggers refuse DELETE on every business table
+  and UPDATE on invoice lines.
+- Who-did-it columns: invoices issued_by / voided_by; bills, payments,
+  collections created_by / cancelled_by / cancelled_at; suppliers created_by.
+- Extras: per-record history (invoice, journal entry, supplier, account, user
+  activity), supplier corrections with before / after, audit report filters,
+  daily automatic backup (`einvoice/backup.py`, keeps 30).
+- Tests sign in through `tests/conftest.py::sign_in`.

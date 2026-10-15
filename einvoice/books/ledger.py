@@ -11,7 +11,9 @@ import getpass
 import hashlib
 import json
 import os
+import socket
 import sqlite3
+from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
@@ -46,18 +48,113 @@ def now() -> str:
     return datetime.now(PH_TZ).isoformat(timespec="seconds")
 
 
-def current_user() -> str:
-    """The Windows user running the app (the app has no logins of its own)."""
+# The person logged in to the app for the current request (set by the web
+# app). Postings and the audit trail are recorded under this name.
+_acting_user: ContextVar[str | None] = ContextVar("acting_user", default=None)
+
+
+def set_acting_user(username: str | None):
+    return _acting_user.set(username)
+
+
+def reset_acting_user(token) -> None:
+    _acting_user.reset(token)
+
+
+def windows_user() -> str:
     try:
         return os.environ.get("USERNAME") or getpass.getuser()
     except Exception:
         return "unknown"
 
 
+def workstation() -> str:
+    """Windows account and computer name, recorded next to the app user."""
+    return f"{windows_user()}@{socket.gethostname()}"
+
+
+def current_user() -> str:
+    return _acting_user.get() or f"system ({windows_user()})"
+
+
+def _audit_hash(prev_hash: str, row: dict) -> str:
+    payload = json.dumps([prev_hash, row], sort_keys=True, ensure_ascii=False,
+                         separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+AUDIT_FIELDS = ("at", "user", "action", "detail", "entity", "entity_id", "changes",
+                "workstation")
+
+
 def audit(conn: sqlite3.Connection, action: str, detail: str = "",
-          user: str | None = None) -> None:
-    conn.execute("INSERT INTO audit_log (at, user, action, detail) VALUES (?,?,?,?)",
-                 (now(), user or current_user(), action, detail))
+          user: str | None = None, *, entity: str = "", entity_id: str | int = "",
+          changes: dict | None = None) -> None:
+    """Add a row to the audit trail. `changes` is {field: [before, after]} for
+    a modification. Rows are chained by hash and can't be changed afterwards."""
+    row = {"at": now(), "user": user or current_user(), "action": action,
+           "detail": detail, "entity": entity, "entity_id": str(entity_id),
+           "changes": json.dumps(changes, ensure_ascii=False, default=str) if changes else "",
+           "workstation": workstation()}
+    own = not conn.in_transaction
+    if own:
+        conn.execute("BEGIN IMMEDIATE")
+    try:
+        last = conn.execute("SELECT hash FROM audit_log ORDER BY id DESC LIMIT 1").fetchone()
+        prev = last["hash"] if last else GENESIS
+        conn.execute(
+            f"INSERT INTO audit_log ({', '.join(AUDIT_FIELDS)}, prev_hash, hash) "
+            f"VALUES ({', '.join('?' * len(AUDIT_FIELDS))}, ?, ?)",
+            [row[k] for k in AUDIT_FIELDS] + [prev, _audit_hash(prev, row)])
+        if own:
+            conn.execute("COMMIT")
+    except BaseException:
+        if own:
+            conn.execute("ROLLBACK")
+        raise
+
+
+def changed(before: dict, after: dict) -> dict:
+    """{field: [before, after]} for the fields that differ."""
+    return {k: [before.get(k), after[k]] for k in after if before.get(k) != after[k]}
+
+
+def seal_audit(conn: sqlite3.Connection) -> None:
+    """Hash audit rows written before the audit trail was chained (upgrade)."""
+    if not conn.execute("SELECT 1 FROM audit_log WHERE hash = '' LIMIT 1").fetchone():
+        return
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        prev = GENESIS
+        for r in conn.execute("SELECT * FROM audit_log ORDER BY id").fetchall():
+            if not r["hash"]:
+                digest = _audit_hash(prev, {k: r[k] for k in AUDIT_FIELDS})
+                conn.execute("UPDATE audit_log SET prev_hash = ?, hash = ? WHERE id = ?",
+                             (prev, digest, r["id"]))
+                prev = digest
+            else:
+                prev = r["hash"]
+        conn.execute("COMMIT")
+    except BaseException:
+        conn.execute("ROLLBACK")
+        raise
+
+
+def verify_audit(conn: sqlite3.Connection) -> list[str]:
+    problems, prev = [], GENESIS
+    for r in conn.execute("SELECT * FROM audit_log ORDER BY id"):
+        if r["prev_hash"] != prev:
+            problems.append(f"Audit trail row {r['id']}: the row before it was changed or removed.")
+        if _audit_hash(r["prev_hash"], {k: r[k] for k in AUDIT_FIELDS}) != r["hash"]:
+            problems.append(f"Audit trail row {r['id']}: changed after it was written.")
+        prev = r["hash"]
+    return problems
+
+
+def history(conn: sqlite3.Connection, entity: str, entity_id: str | int) -> list[sqlite3.Row]:
+    """Audit rows about one record, oldest first."""
+    return conn.execute("SELECT * FROM audit_log WHERE entity = ? AND entity_id = ? ORDER BY id",
+                        (entity, str(entity_id))).fetchall()
 
 
 # --- Accounts ----------------------------------------------------------------
@@ -97,7 +194,9 @@ def close_through(conn: sqlite3.Connection, through: date) -> None:
     conn.execute("INSERT INTO settings (key, value) VALUES ('closed_through', ?) "
                  "ON CONFLICT (key) DO UPDATE SET value = excluded.value",
                  (through.isoformat(),))
-    audit(conn, "close books", f"closed through {through}")
+    audit(conn, "close books", f"closed through {through}", entity="settings",
+          entity_id="closed_through",
+          changes={"closed_through": [current.isoformat() if current else "", through.isoformat()]})
 
 
 def check_open(conn: sqlite3.Connection, d: date) -> None:
@@ -184,7 +283,8 @@ def post(conn: sqlite3.Connection, *, book: str, entry_date: date, particulars: 
     for no, l in enumerate(lines, start=1):
         conn.execute("INSERT INTO journal_lines VALUES (?,?,?,?,?,?)",
                      (entry_id, no, l.account, _amount(l.debit), _amount(l.credit), l.memo))
-    audit(conn, "post", f"{book} {entry_no} ({entry_date}): {particulars}", user)
+    audit(conn, "post", f"{book} {entry_no} ({entry_date}): {particulars}", user,
+          entity="journal", entity_id=f"{book}-{entry_no}")
     return entry_id
 
 
@@ -253,3 +353,13 @@ def verify(conn: sqlite3.Connection) -> list[str]:
             problems.append(f"{name}: debits and credits do not balance.")
         prev_hash = row["hash"]
     return problems
+
+
+def change_list(changes: str) -> list[tuple[str, object, object]]:
+    """An audit row's `changes` as (field, before, after) tuples."""
+    if not changes:
+        return []
+    try:
+        return [(k, v[0], v[1]) for k, v in json.loads(changes).items()]
+    except (ValueError, TypeError, IndexError, AttributeError):
+        return []

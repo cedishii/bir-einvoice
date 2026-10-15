@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}My account{% endblock %}
+{% block content %}
+<div class="heading">
+  <h1>{{ me.full_name }}</h1>
+  <p class="muted">{{ me.username }} · {{ roles[me.role] }}{% if me.last_login_at %} · signed in {{ me.last_login_at.replace("T", " ")[:16] }}{% endif %}</p>
+</div>
+
+<form method="post" action="{{ url_for('auth.change_password') }}" class="card">
+  <h2>{{ "Choose your own password" if me.must_change else "Change password" }}</h2>
+  {% if me.must_change %}<p class="notice-box">You signed in with a temporary password. Choose your own to continue.</p>{% endif %}
+  <div class="row three">
+    <label class="field"><span>Current password</span><input type="password" name="current" autocomplete="current-password" required></label>
+    <label class="field"><span>New password</span><input type="password" name="new" autocomplete="new-password" required>
+      <small>At least 8 characters, with letters and numbers</small></label>
+    <label class="field"><span>New password again</span><input type="password" name="new2" autocomplete="new-password" required></label>
+  </div>
+  <div class="actions"><button class="button" type="submit">Save password</button></div>
+</form>
+
+<section class="card">
+  <h2>Recent sign-ins</h2>
+  <p class="muted">If you see a sign-in you don't recognise, change your password and tell an administrator.</p>
+  <table class="grid compact">
+    <thead><tr><th>When</th><th>What</th><th>Computer</th></tr></thead>
+    <tbody>
+    {% for l in logins %}
+      <tr><td>{{ l.at.replace("T", " ")[:19] }}</td><td>{{ l.action }}{% if l.detail %} <small class="muted">({{ l.detail }})</small>{% endif %}</td>
+        <td class="muted">{{ l.workstation }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

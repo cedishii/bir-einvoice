@@ -354,11 +354,52 @@ def withholding(conn: sqlite3.Connection, kind: str, start: date, end: date,
 
 # --- Audit log ---------------------------------------------------------------
 
-def audit_log(conn: sqlite3.Connection, start: date, end: date) -> Report:
+ENTITY_NAMES = {
+    "invoice": "Invoice", "journal": "Journal entry", "collection": "Collection",
+    "bill": "Bill", "payment": "Payment", "customer": "Client", "supplier": "Supplier",
+    "account": "Account", "user": "User", "settings": "Setting", "report": "Report",
+    "database": "Database", "bir": "BIR",
+}
+
+
+def audit_log(conn: sqlite3.Connection, start: date, end: date, *, user: str | None = None,
+              action: str | None = None, entity: str | None = None,
+              entity_id: str | None = None) -> Report:
+    """Everything done in the app: entries, changes (with before and after),
+    cancellations, sign-ins, printouts and exports, each with the user and
+    the computer it was done from."""
     r = Report("audit", "Audit Trail", start, end, [
-        Column("When", width=1.4), Column("User", width=1.0), Column("Action", width=1.0),
-        Column("Detail", width=5.0)])
-    for x in conn.execute("SELECT * FROM audit_log WHERE substr(at, 1, 10) BETWEEN ? AND ? "
-                          "ORDER BY id", (start.isoformat(), end.isoformat())):
-        r.rows.append(Row([x["at"].replace("T", " ")[:19], x["user"], x["action"], x["detail"]]))
+        Column("When", width=1.3), Column("User", width=0.9), Column("Computer", width=1.2),
+        Column("Action", width=1.0), Column("Record", width=1.1), Column("Details", width=4.2)])
+    sql = "SELECT * FROM audit_log WHERE substr(at, 1, 10) BETWEEN ? AND ?"
+    args: list = [start.isoformat(), end.isoformat()]
+    for column, value in (("user", user), ("action", action), ("entity", entity),
+                          ("entity_id", entity_id)):
+        if value:
+            sql += f" AND {column} = ?"
+            args.append(value)
+    for x in conn.execute(sql + " ORDER BY id", args):
+        details = x["detail"]
+        changes = "; ".join(f"{f}: {_blank(b)} -> {_blank(a)}"
+                            for f, b, a in ledger.change_list(x["changes"]))
+        if changes:
+            details = f"{details} [{changes}]" if details else changes
+        record = (f"{ENTITY_NAMES.get(x['entity'], x['entity'])} {x['entity_id']}".strip()
+                  if x["entity"] else "")
+        r.rows.append(Row([x["at"].replace("T", " ")[:19], x["user"], x["workstation"],
+                           x["action"], record, details]))
+    filters = [f"{k} {v}" for k, v in (("user", user), ("action", action),
+                                       ("record type", ENTITY_NAMES.get(entity or "", entity)),
+                                       ("record", entity_id))
+               if v]
+    if filters:
+        r.notes.append("Filtered by " + ", ".join(filters) + ".")
+    r.notes.append("Nothing can be deleted in this system: invoices are voided, documents "
+                   "cancelled, entries reversed, accounts and users deactivated. Each row is "
+                   "chained to the one before it, so a changed or removed row shows up in the "
+                   "integrity check.")
     return r
+
+
+def _blank(value) -> str:
+    return "(blank)" if value in (None, "") else str(value)

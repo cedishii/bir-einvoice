@@ -1,0 +1,21 @@
+{% if history %}
+<details class="card" {{ 'open' if history_open }}>
+  <summary>History <small class="muted">({{ history | length }} from the audit trail)</small></summary>
+  <table class="grid compact">
+    <thead><tr><th>When</th><th>Who</th><th>What</th><th>Details</th></tr></thead>
+    <tbody>
+    {% for h in history %}
+      <tr>
+        <td>{{ h.at.replace("T", " ")[:19] }}</td>
+        <td>{{ h.user }}<small class="muted block">{{ h.workstation }}</small></td>
+        <td>{{ h.action }}</td>
+        <td>{{ h.detail }}
+          {% for field, before, after in h.changes | changes %}
+            <small class="block"><strong>{{ field }}</strong>: {{ before if before not in (None, "") else "(blank)" }} &rarr; {{ after if after not in (None, "") else "(blank)" }}</small>
+          {% endfor %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</details>
+{% endif %}

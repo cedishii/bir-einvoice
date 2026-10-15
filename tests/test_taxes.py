@@ -8,6 +8,7 @@ from einvoice.books.ledger import BooksError
 from einvoice.models import VATABLE
 from einvoice.web.app import create_app
 from tests.conftest import make_invoice
+from tests.conftest import sign_in
 
 
 def amounts(report) -> dict[str, D]:
@@ -160,7 +161,7 @@ def test_calendar(repo):
 def client(config):
     app = create_app(config)
     app.testing = True
-    return app.test_client()
+    return sign_in(app)
 
 
 def test_tax_pages(client):

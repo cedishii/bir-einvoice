@@ -265,6 +265,73 @@ MIGRATIONS = [
     """
     ALTER TABLE accounts ADD COLUMN is_cost INTEGER NOT NULL DEFAULT 0;
     """,
+    # 8: user logins and a tamper-evident audit trail. Every row of the audit
+    # trail carries the hash of the row before it; rows can't be changed or
+    # removed once sealed. Business records can't be deleted at all.
+    """
+    CREATE TABLE users (
+        id              INTEGER PRIMARY KEY,
+        username        TEXT NOT NULL UNIQUE COLLATE NOCASE,
+        full_name       TEXT NOT NULL,
+        role            TEXT NOT NULL CHECK (role IN ('admin', 'accountant', 'encoder', 'auditor')),
+        password_hash   TEXT NOT NULL,
+        must_change     INTEGER NOT NULL DEFAULT 1,
+        active          INTEGER NOT NULL DEFAULT 1,
+        failed_logins   INTEGER NOT NULL DEFAULT 0,
+        locked_until    TEXT NOT NULL DEFAULT '',
+        last_login_at   TEXT NOT NULL DEFAULT '',
+        created_at      TEXT NOT NULL,
+        created_by      TEXT NOT NULL
+    );
+
+    ALTER TABLE audit_log ADD COLUMN entity TEXT NOT NULL DEFAULT '';
+    ALTER TABLE audit_log ADD COLUMN entity_id TEXT NOT NULL DEFAULT '';
+    ALTER TABLE audit_log ADD COLUMN changes TEXT NOT NULL DEFAULT '';
+    ALTER TABLE audit_log ADD COLUMN workstation TEXT NOT NULL DEFAULT '';
+    ALTER TABLE audit_log ADD COLUMN prev_hash TEXT NOT NULL DEFAULT '';
+    ALTER TABLE audit_log ADD COLUMN hash TEXT NOT NULL DEFAULT '';
+    CREATE INDEX audit_log_entity ON audit_log (entity, entity_id);
+    CREATE TRIGGER audit_log_final_u BEFORE UPDATE ON audit_log WHEN OLD.hash != ''
+    BEGIN SELECT RAISE(ABORT, 'The audit trail can''t be changed.'); END;
+    CREATE TRIGGER audit_log_final_d BEFORE DELETE ON audit_log
+    BEGIN SELECT RAISE(ABORT, 'The audit trail can''t be changed.'); END;
+
+    ALTER TABLE invoices ADD COLUMN issued_by TEXT NOT NULL DEFAULT '';
+    ALTER TABLE invoices ADD COLUMN voided_by TEXT NOT NULL DEFAULT '';
+    ALTER TABLE bills ADD COLUMN created_by TEXT NOT NULL DEFAULT '';
+    ALTER TABLE bills ADD COLUMN cancelled_by TEXT NOT NULL DEFAULT '';
+    ALTER TABLE bills ADD COLUMN cancelled_at TEXT NOT NULL DEFAULT '';
+    ALTER TABLE payments ADD COLUMN created_by TEXT NOT NULL DEFAULT '';
+    ALTER TABLE payments ADD COLUMN cancelled_by TEXT NOT NULL DEFAULT '';
+    ALTER TABLE payments ADD COLUMN cancelled_at TEXT NOT NULL DEFAULT '';
+    ALTER TABLE collections ADD COLUMN created_by TEXT NOT NULL DEFAULT '';
+    ALTER TABLE collections ADD COLUMN cancelled_by TEXT NOT NULL DEFAULT '';
+    ALTER TABLE collections ADD COLUMN cancelled_at TEXT NOT NULL DEFAULT '';
+    ALTER TABLE suppliers ADD COLUMN created_by TEXT NOT NULL DEFAULT '';
+
+    -- Nothing is ever deleted: invoices are voided, documents cancelled,
+    -- accounts and users deactivated. Invoice lines never change.
+    CREATE TRIGGER invoices_no_delete BEFORE DELETE ON invoices
+    BEGIN SELECT RAISE(ABORT, 'Records are never deleted; void or cancel instead.'); END;
+    CREATE TRIGGER invoice_lines_no_delete BEFORE DELETE ON invoice_lines
+    BEGIN SELECT RAISE(ABORT, 'Records are never deleted; void or cancel instead.'); END;
+    CREATE TRIGGER invoice_lines_no_update BEFORE UPDATE ON invoice_lines
+    BEGIN SELECT RAISE(ABORT, 'Issued invoices can''t be changed; void and reissue.'); END;
+    CREATE TRIGGER bills_no_delete BEFORE DELETE ON bills
+    BEGIN SELECT RAISE(ABORT, 'Records are never deleted; void or cancel instead.'); END;
+    CREATE TRIGGER payments_no_delete BEFORE DELETE ON payments
+    BEGIN SELECT RAISE(ABORT, 'Records are never deleted; void or cancel instead.'); END;
+    CREATE TRIGGER collections_no_delete BEFORE DELETE ON collections
+    BEGIN SELECT RAISE(ABORT, 'Records are never deleted; void or cancel instead.'); END;
+    CREATE TRIGGER customers_no_delete BEFORE DELETE ON customers
+    BEGIN SELECT RAISE(ABORT, 'Records are never deleted; void or cancel instead.'); END;
+    CREATE TRIGGER suppliers_no_delete BEFORE DELETE ON suppliers
+    BEGIN SELECT RAISE(ABORT, 'Records are never deleted; void or cancel instead.'); END;
+    CREATE TRIGGER accounts_no_delete BEFORE DELETE ON accounts
+    BEGIN SELECT RAISE(ABORT, 'Records are never deleted; deactivate the account instead.'); END;
+    CREATE TRIGGER users_no_delete BEFORE DELETE ON users
+    BEGIN SELECT RAISE(ABORT, 'Users are never deleted; deactivate them instead.'); END;
+    """,
 ]
 
 
@@ -275,8 +342,9 @@ def connect(path: Path) -> sqlite3.Connection:
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("PRAGMA journal_mode = WAL")
     migrate(conn)
-    from ..books import postings  # the books need the schema above
+    from ..books import ledger, postings  # the books need the schema above
     postings.sync(conn)
+    ledger.seal_audit(conn)  # rows written before the audit trail was hashed
     return conn
 
 

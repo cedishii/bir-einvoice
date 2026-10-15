@@ -59,16 +59,24 @@ def find_or_create_customer(conn: sqlite3.Connection, *, name: str, tin: str, br
                             address: str, business_style: str = "", email: str = "") -> int:
     """Customers are kept from the invoices: same name + TIN + branch = same customer.
     The address, business style and e-mail follow the latest invoice."""
-    row = conn.execute("SELECT id FROM customers WHERE name = ? AND tin = ? AND branch = ?",
+    row = conn.execute("SELECT * FROM customers WHERE name = ? AND tin = ? AND branch = ?",
                        (name, tin, branch)).fetchone()
+    after = {"address": address, "business_style": business_style, "email": email}
     if row:
-        conn.execute("UPDATE customers SET address = ?, business_style = ?, email = ? "
-                     "WHERE id = ?", (address, business_style, email, row["id"]))
+        changes = ledger.changed(dict(row), after)
+        if changes:
+            conn.execute("UPDATE customers SET address = ?, business_style = ?, email = ? "
+                         "WHERE id = ?", (address, business_style, email, row["id"]))
+            ledger.audit(conn, "change client", f"{name} (from an invoice)",
+                         entity="customer", entity_id=row["id"], changes=changes)
         return row["id"]
-    return conn.execute(
+    cid = conn.execute(
         """INSERT INTO customers (name, tin, branch, address, business_style, email, created_at)
            VALUES (?,?,?,?,?,?,?)""",
         (name, tin, branch, address, business_style, email, ledger.now())).lastrowid
+    ledger.audit(conn, "add client", f"{name} (TIN {tin}-{branch})", entity="customer",
+                 entity_id=cid)
+    return cid
 
 
 def create_supplier(conn: sqlite3.Connection, *, name: str, tin: str, branch: str,
@@ -81,10 +89,35 @@ def create_supplier(conn: sqlite3.Connection, *, name: str, tin: str, branch: st
         raise BooksError(f"Supplier {name} with this TIN is already on file.")
     with transaction(conn):
         sid = conn.execute(
-            "INSERT INTO suppliers (name, tin, branch, address, created_at) VALUES (?,?,?,?,?)",
-            (name, tin, branch, address, ledger.now())).lastrowid
-        ledger.audit(conn, "add supplier", f"{name} (TIN {tin}-{branch})")
+            "INSERT INTO suppliers (name, tin, branch, address, created_at, created_by) "
+            "VALUES (?,?,?,?,?,?)",
+            (name, tin, branch, address, ledger.now(), ledger.current_user())).lastrowid
+        ledger.audit(conn, "add supplier", f"{name} (TIN {tin}-{branch})",
+                     entity="supplier", entity_id=sid)
     return sid
+
+
+def update_supplier(conn: sqlite3.Connection, supplier_id: int, *, name: str, tin: str,
+                    branch: str, address: str) -> None:
+    """Correct a supplier's details. The change (before and after) is audited;
+    posted entries keep pointing at the same supplier."""
+    s = conn.execute("SELECT * FROM suppliers WHERE id = ?", (supplier_id,)).fetchone()
+    if s is None:
+        raise BooksError("No such supplier.")
+    after = {"name": _clean(name), "tin": tin, "branch": branch, "address": _clean(address)}
+    if not after["name"] or not after["address"]:
+        raise BooksError("Supplier name and address are required.")
+    if conn.execute("SELECT 1 FROM suppliers WHERE name = ? AND tin = ? AND branch = ? AND id != ?",
+                    (after["name"], tin, branch, supplier_id)).fetchone():
+        raise BooksError("Another supplier with this name and TIN is already on file.")
+    changes = ledger.changed(dict(s), after)
+    if not changes:
+        return
+    with transaction(conn):
+        conn.execute("UPDATE suppliers SET name = ?, tin = ?, branch = ?, address = ? WHERE id = ?",
+                     (after["name"], tin, branch, after["address"], supplier_id))
+        ledger.audit(conn, "change supplier", after["name"], entity="supplier",
+                     entity_id=supplier_id, changes=changes)
 
 
 # --- Sales invoices ----------------------------------------------------------
@@ -251,12 +284,16 @@ def create_collection(conn: sqlite3.Connection, *, customer_id: int, coll_date: 
     with transaction(conn):
         cid = conn.execute(
             """INSERT INTO collections (customer_id, invoice_id, coll_date, reference, applied,
-                   cash, cwt, atc, cwt_base, cwt_rate, cash_account, created_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+                   cash, cwt, atc, cwt_base, cwt_rate, cash_account, created_at, created_by)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (customer_id, invoice_id, coll_date.isoformat(), reference, str(applied),
              str(cash), str(cwt), atc, str(cwt_base), str(cwt_rate), cash_account,
-             ledger.now())).lastrowid
+             ledger.now(), ledger.current_user())).lastrowid
         what = f"SI {inv['control_no']}" if invoice_id else "on account"
+        ledger.audit(conn, "add collection",
+                     f"{reference}: {customer['name']} ({what}), applied {applied:,.2f}, "
+                     f"cash {cash:,.2f}, tax withheld {cwt:,.2f}",
+                     entity="collection", entity_id=cid)
         ledger.post(conn, book="CRJ", entry_date=coll_date,
                     particulars=f"Collection from {customer['name']} ({what})",
                     lines=lines, reference=reference, party=("customer", customer_id),
@@ -294,10 +331,14 @@ def create_bill(conn: sqlite3.Connection, *, supplier_id: int, bill_date: date,
     with transaction(conn):
         bid = conn.execute(
             """INSERT INTO bills (supplier_id, bill_date, supplier_ref, description,
-                   account_code, category, net, vat, total, created_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                   account_code, category, net, vat, total, created_at, created_by)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
             (supplier_id, bill_date.isoformat(), supplier_ref, description, account_code,
-             category, str(net), str(vat), str(total), ledger.now())).lastrowid
+             category, str(net), str(vat), str(total), ledger.now(),
+             ledger.current_user())).lastrowid
+        ledger.audit(conn, "add bill",
+                     f"{supplier['name']} {supplier_ref}: {description}, net {net:,.2f}, "
+                     f"VAT {vat:,.2f}", entity="bill", entity_id=bid)
         ledger.post(conn, book="PJ", entry_date=bill_date,
                     particulars=f"{description} - {supplier['name']}",
                     lines=[Line(account_code, debit=net),
@@ -339,11 +380,15 @@ def create_payment(conn: sqlite3.Connection, *, supplier_id: int, pay_date: date
     with transaction(conn):
         pid = conn.execute(
             """INSERT INTO payments (supplier_id, bill_id, pay_date, reference, amount, atc,
-                   ewt_base, ewt_rate, ewt, cash_account, created_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                   ewt_base, ewt_rate, ewt, cash_account, created_at, created_by)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
             (supplier_id, bill_id, pay_date.isoformat(), reference, str(amount), atc,
-             str(ewt_base), str(ewt_rate), str(ewt), cash_account, ledger.now())).lastrowid
+             str(ewt_base), str(ewt_rate), str(ewt), cash_account, ledger.now(),
+             ledger.current_user())).lastrowid
         what = f"bill {bill['supplier_ref']}" if bill_id else "on account"
+        ledger.audit(conn, "add payment",
+                     f"{reference}: {supplier['name']} ({what}), {amount:,.2f}, "
+                     f"tax withheld {ewt:,.2f}", entity="payment", entity_id=pid)
         ledger.post(conn, book="CDJ", entry_date=pay_date,
                     particulars=f"Payment to {supplier['name']} ({what})",
                     lines=[Line(ledger.account_for(conn, "ap"), debit=amount),
@@ -377,8 +422,11 @@ def cancel(conn: sqlite3.Connection, kind: str, doc_id: int, reason: str) -> int
     if kind == "bill" and payments_for_bill(conn, doc_id):
         raise BooksError("This bill has payments recorded against it. Cancel those first.")
     with transaction(conn):
-        conn.execute(f"UPDATE {table} SET status = 'cancelled', cancel_reason = ? WHERE id = ?",
-                     (reason, doc_id))
+        conn.execute(f"UPDATE {table} SET status = 'cancelled', cancel_reason = ?, "
+                     "cancelled_by = ?, cancelled_at = ? WHERE id = ?",
+                     (reason, ledger.current_user(), ledger.now(), doc_id))
+        ledger.audit(conn, f"cancel {kind}", reason, entity=kind, entity_id=doc_id,
+                     changes={"status": ["posted", "cancelled"]})
         e = ledger.entry_for(conn, kind, doc_id)
         return ledger.reverse(conn, e["id"], entry_date=today_ph(),
                               reason=f"{kind} cancelled ({reason})")

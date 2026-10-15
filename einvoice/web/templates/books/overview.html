@@ -16,6 +16,13 @@
     <p><span class="ok">Journal check OK.</span>
       <span class="muted">Every entry balances and none was changed, removed or inserted after posting.</span></p>
   {% endif %}
+  {% if audit_problems %}
+    <p class="bad">The audit trail check FAILED. Rows were changed or removed outside the app:</p>
+    <ul>{% for p in audit_problems %}<li>{{ p }}</li>{% endfor %}</ul>
+  {% else %}
+    <p><span class="ok">Audit trail check OK.</span>
+      <span class="muted">All {{ audit_rows }} rows are intact. <a href="{{ url_for('books.report', key='audit') }}">Open the audit trail</a>.</span></p>
+  {% endif %}
   <p class="muted">Entries per book:
     {% for k, n in counts.items() %}{{ k }} {{ n }}{{ ", " if not loop.last }}{% endfor %}.
     Books closed through: <strong>{{ closed or "not closed yet" }}</strong>.</p>
@@ -70,6 +77,7 @@
   <p class="muted">All journals, ledgers, the trial balance, the quarterly BIR reports and the audit trail as PDF and CSV,
     with a manifest of SHA-256 checksums. This is what goes on the disc for the yearly submission of computerized books.</p>
 
+  {% if can('approve') %}
   <form method="post" action="{{ url_for('books.close_books') }}" class="filters"
         onsubmit="return confirm('Close the books through ' + this.through.value + '? Nothing can be posted on or before that date afterwards, and this cannot be undone.')">
     <label class="field"><span>Close the books through</span>
@@ -77,5 +85,6 @@
     <div class="quick"><button class="button secondary" type="submit">Close period</button></div>
   </form>
   <p class="muted">After a month or year is filed, close it so nothing can be posted back into it. Corrections then go into the open period.</p>
+  {% endif %}
 </section>
 {% endblock %}

@@ -231,3 +231,17 @@ tr.cancelled td { color: #999; }
 .scroll-x { overflow-x: auto; }
 .sidebar nav { overflow-y: auto; min-height: 0; }
 .sidebar nav a { padding-top: 9px; padding-bottom: 9px; }
+
+/* Signed-in user and the login pages */
+.sidebar-foot .who { display: flex; flex-direction: column; gap: 2px; padding-bottom: 8px; border-bottom: 1px solid #2a2a2e; margin-bottom: 4px; }
+.sidebar-foot .who a { color: #fff; text-decoration: none; font-weight: 600; font-size: 13px; }
+.sidebar-foot .who form { margin: 0; }
+.sidebar-foot .who button.link { color: #c9c9cf; font-size: 12px; padding: 2px 0; }
+.sidebar-foot .who button.link:hover { color: #fff; }
+body.bare { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 24px 16px; }
+.bare-card { width: min(420px, 100%); background: var(--card); border-radius: 12px; padding: 28px 28px 22px;
+             box-shadow: 0 10px 40px rgba(0, 0, 0, .08); }
+.bare-card img { width: 130px; display: block; margin-bottom: 14px; }
+.bare-card h1 { font-size: 20px; margin: 0 0 4px; }
+.bare-card .button { width: 100%; padding: 11px; margin-top: 6px; }
+.notice-box { background: #fff6d6; border: 1px solid #ecd98a; border-radius: 8px; padding: 10px 14px; margin: 12px 0; }

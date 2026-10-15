@@ -33,12 +33,14 @@
           {% if a.code in used %}<small class="muted">in use</small>{% endif %}</td>
       <td><input type="checkbox" name="active" value="1" form="acct-{{ a.code }}" {{ 'checked' if a.active }} {{ 'disabled' if a.role }}>
           {% if a.role %}<input type="hidden" name="active" value="1" form="acct-{{ a.code }}">{% endif %}</td>
-      <td><button class="link" type="submit" form="acct-{{ a.code }}">Save</button></td>
+      <td>{% if can('approve') %}<button class="link" type="submit" form="acct-{{ a.code }}">Save</button>{% endif %}
+        <a class="muted" href="{{ url_for('books.report', key='audit', entity='account', id=a.code, **{'from': '2000-01-01'}) }}">History</a></td>
     </tr>
   {% endfor %}
   </tbody>
 </table>
 
+{% if can('approve') %}
 <form method="post" action="{{ url_for('books.add_account') }}" class="card">
   <h2>Add an account</h2>
   <div class="filters">
@@ -51,4 +53,5 @@
     <div class="quick"><button class="button" type="submit">Add account</button></div>
   </div>
 </form>
+{% endif %}
 {% endblock %}
