@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Tax returns{% endblock %}
+{% block content %}
+<div class="heading">
+  <h1>Tax returns</h1>
+  <p class="muted">Worksheets with the figures for each BIR return, computed from the books. Nothing is filed or paid
+    from here: copy the figures onto the official form (eBIRForms / eFPS).</p>
+</div>
+
+<section class="card">
+  <div class="heading with-actions">
+    <h2>Calendar</h2>
+    <div class="actions">
+      {% if show_all %}<a href="{{ url_for('books.taxes_page') }}">Only the returns that apply</a>
+      {% else %}<a href="{{ url_for('books.taxes_page', all=1) }}">Include all forms</a>{% endif %}
+    </div>
+  </div>
+  <p class="muted">Due dates from the last 45 days to the next 4 months. Weekend dates move to Monday; check BIR's
+    calendar for holidays and extensions. The app can't know what was filed, so "due date passed" only means the date is behind us.
+    {% if closed %}Books closed through {{ closed }}.{% endif %}</p>
+  {% if deadlines %}
+  <table class="grid compact">
+    <thead><tr><th>Due</th><th>Form</th><th>Period</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    {% for d in deadlines %}
+      <tr class="{{ '' if d.applies else 'cancelled' }}">
+        <td><strong>{{ d.due.strftime("%b %d, %Y") }}</strong> <small class="muted">{{ d.due.strftime("%a") }}</small></td>
+        <td><strong>{{ d.code }}</strong> {{ d.label }}{% if d.form and d.form.attaches_to %} <small class="muted">(with {{ d.form.attaches_to }})</small>{% endif %}
+          {% if not d.applies %}<small class="muted">· not applicable to the current setup</small>{% endif %}</td>
+        <td>{{ d.period }}</td>
+        <td>{% if d.status == "open" %}<span class="badge unconfirmed">period still open</span>
+            {% elif d.status == "ready" %}<span class="badge posted">ready to prepare</span>
+            {% else %}<span class="badge cancelled">due date passed</span>{% endif %}
+            {% if closed and closed >= d.end %}<small class="muted">· books closed</small>{% endif %}</td>
+        <td>{% if d.form %}<a href="{{ url_for('books.tax_form', code=d.code, year=d.start.year, n=d.n) }}">Worksheet</a>
+            {% else %}<a href="{{ url_for(d.link[0], **d.link[1]) }}">Open</a>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted">Nothing due in this window.</p>{% endif %}
+</section>
+
+<section class="card">
+  <h2>Forms</h2>
+  {% for group in ["Business tax", "Withholding tax", "Income tax"] %}
+  <h3>{{ group }}</h3>
+  <ul class="report-list">
+    {% for f, ok in forms if f.group == group %}
+    <li><a href="{{ url_for('books.tax_form', code=f.code) }}" {% if not ok %}style="opacity:.6"{% endif %}>
+      <strong>{{ f.code }}</strong> {{ f.title }}
+      <small>{{ {"month": "Monthly", "quarter": "Quarterly", "year": "Annual"}[f.period] }}{% if f.attaches_to %} · attachment to {{ f.attaches_to }}{% endif %}{% if not ok %} · not applicable to the current setup{% endif %}</small></a></li>
+    {% endfor %}
+  </ul>
+  {% endfor %}
+  <p class="muted">Not offered: 2550M (monthly VAT, no longer filed from 2023) and the monthly 1601E (replaced by 0619E and 1601EQ).
+    1601C (tax withheld on salaries) needs payroll, which the app doesn't keep.</p>
+</section>
+
+<form method="post" action="{{ url_for('books.save_tax_settings') }}" class="card" id="settings">
+  <h2>Tax settings</h2>
+  <p class="muted">These decide which returns apply and how income tax is computed. Confirm them with the accountant.</p>
+  <div class="row">
+    {% for key in ["taxpayer", "vat_registered"] %}
+    <label class="field"><span>{{ {"taxpayer": "Taxpayer", "vat_registered": "VAT registration"}[key] }}</span>
+      <select name="{{ key }}">{% for v, label in choices[key].items() %}<option value="{{ v }}" {{ 'selected' if settings[key] == v }}>{{ label }}</option>{% endfor %}</select></label>
+    {% endfor %}
+  </div>
+  <fieldset>
+    <legend>Corporation</legend>
+    <div class="row three">
+      <label class="field"><span>Income tax rate (%)</span><input name="corp_rate" value="{{ settings.corp_rate }}" class="num">
+        <small>25%, or 20% for net taxable income up to PHP 5 million and total assets up to PHP 100 million (land excluded)</small></label>
+      <label class="field"><span>Minimum corporate income tax (%)</span><input name="mcit_rate" value="{{ settings.mcit_rate }}" class="num">
+        <small>Of gross income</small></label>
+      <label class="field"><span>MCIT applies</span>
+        <select name="mcit_applies">{% for v, label in choices.mcit_applies.items() %}<option value="{{ v }}" {{ 'selected' if settings.mcit_applies == v }}>{{ label }}</option>{% endfor %}</select></label>
+    </div>
+  </fieldset>
+  <fieldset>
+    <legend>Individual / non-VAT</legend>
+    <div class="row">
+      <label class="field"><span>Income tax method</span>
+        <select name="individual_method">{% for v, label in choices.individual_method.items() %}<option value="{{ v }}" {{ 'selected' if settings.individual_method == v }}>{{ label }}</option>{% endfor %}</select></label>
+      <label class="field"><span>Percentage tax rate (%)</span><input name="percentage_rate" value="{{ settings.percentage_rate }}" class="num">
+        <small>2551Q, for non-VAT taxpayers</small></label>
+    </div>
+  </fieldset>
+  <div class="actions"><button class="button" type="submit">Save tax settings</button></div>
+</form>
+{% endblock %}

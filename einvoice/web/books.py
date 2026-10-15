@@ -11,7 +11,7 @@ from flask import (Blueprint, Response, abort, current_app, flash, redirect, ren
                    request, url_for)
 
 from .. import money
-from ..books import ledger, postings, printing, reports
+from ..books import ledger, postings, printing, reports, taxes
 from ..books.ledger import BooksError, Line
 from ..books.postings import PURCHASE_CATEGORIES
 from ..models import parse_tin, today_ph
@@ -497,6 +497,7 @@ def add_account():
     name = " ".join(request.form.get("name", "").split())
     kind = request.form.get("type", "")
     is_cash = 1 if request.form.get("is_cash") else 0
+    is_cost = 1 if request.form.get("is_cost") else 0
     try:
         if not (code.isdigit() and 3 <= len(code) <= 8):
             raise BooksError("The account code must be 3 to 8 digits.")
@@ -506,11 +507,13 @@ def add_account():
             raise BooksError("Choose the account type.")
         if is_cash and kind != "asset":
             raise BooksError("Only an asset account can be a cash / bank account.")
+        if is_cost and kind != "expense":
+            raise BooksError("Only an expense account can be cost of sales / services.")
         if c.execute("SELECT 1 FROM accounts WHERE code = ?", (code,)).fetchone():
             raise BooksError(f"Account {code} already exists.")
         with postings.transaction(c):
-            c.execute("INSERT INTO accounts (code, name, type, is_cash) VALUES (?,?,?,?)",
-                      (code, name, kind, is_cash))
+            c.execute("INSERT INTO accounts (code, name, type, is_cash, is_cost) VALUES (?,?,?,?,?)",
+                      (code, name, kind, is_cash, is_cost))
             ledger.audit(c, "add account", f"{code} {name} ({kind})")
         flash(f"Account {code} {name} added.")
     except BooksError as e:
@@ -526,13 +529,15 @@ def update_account(code):
         abort(404)
     name = " ".join(request.form.get("name", a["name"]).split()) or a["name"]
     active = 1 if request.form.get("active") else 0
+    is_cost = 1 if request.form.get("is_cost") and a["type"] == "expense" else 0
     if a["role"] and not active:
         flash(f"{code} {a['name']} is used by the automatic postings and stays active.", "error")
         return redirect(url_for("books.accounts"))
     with postings.transaction(c):
-        c.execute("UPDATE accounts SET name = ?, active = ? WHERE code = ?", (name, active, code))
+        c.execute("UPDATE accounts SET name = ?, active = ?, is_cost = ? WHERE code = ?",
+                  (name, active, is_cost, code))
         ledger.audit(c, "change account", f"{code}: name '{a['name']}' -> '{name}', "
-                     f"active {a['active']} -> {active}")
+                     f"active {a['active']} -> {active}, cost of sales {a['is_cost']} -> {is_cost}")
     flash(f"Account {code} saved.")
     return redirect(url_for("books.accounts"))
 
@@ -566,3 +571,73 @@ def customers():
     rows = conn().execute("SELECT * FROM customers ORDER BY name").fetchall()
     return render_template("books/parties.html", kind="customer", rows=rows,
                            tin=reports.tin_text, data={}, errors={})
+
+
+# --- Tax returns -------------------------------------------------------------
+
+@bp.get("/taxes")
+def taxes_page():
+    c = conn()
+    show_all = bool(request.args.get("all"))
+    settings = taxes.tax_settings(c)
+    forms = [(f, f.applies(settings)) for f in taxes.FORMS]
+    return render_template("books/taxes.html", deadlines=taxes.calendar(c, show_all=show_all),
+                           forms=forms, settings=settings, choices=taxes.CHOICES,
+                           show_all=show_all, today=today_ph(), year=today_ph().year,
+                           closed=ledger.closed_through(c))
+
+
+@bp.post("/taxes/settings")
+def save_tax_settings():
+    c = conn()
+    try:
+        with postings.transaction(c):
+            taxes.save_tax_settings(c, request.form.to_dict())
+        flash("Tax settings saved.")
+    except BooksError as e:
+        flash(str(e), "error")
+    return redirect(url_for("books.taxes_page") + "#settings")
+
+
+@bp.get("/taxes/<code>")
+def tax_form(code):
+    form = taxes.BY_CODE.get(code)
+    if form is None:
+        abort(404)
+    c = conn()
+    today = today_ph()
+    year = request.args.get("year", type=int) or today.year
+    allowed = taxes.periods(form, year)
+    default_n = {"month": today.month, "quarter": (today.month - 1) // 3 + 1}.get(form.period, 1)
+    if default_n not in allowed:
+        default_n = max([n for n in allowed if n < default_n] or allowed[:1])
+    n = request.args.get("n", type=int) or default_n
+    params = {}
+    for key, label in form.inputs:
+        text = request.args.get(key, "").strip()
+        try:
+            params[key] = money.parse_decimal(text or "0", field=label, max_decimals=2,
+                                              positive=False)
+        except money.MoneyError as e:
+            flash(str(e), "error")
+            params[key] = money.ZERO
+    try:
+        r = taxes.worksheet(c, form, year, n, params)
+    except BooksError as e:
+        flash(str(e), "error")
+        return redirect(url_for("books.tax_form", code=code, year=year))
+    fmt = request.args.get("format")
+    if fmt == "pdf":
+        ledger.audit(c, "print", f"{r.title}, {r.period}")
+        return _download(printing.report_pdf(r, cfg()), f"{r.key}.pdf", "application/pdf",
+                         inline=True)
+    if fmt == "csv":
+        ledger.audit(c, "export", f"{r.title}, {r.period} (CSV)")
+        return _download(printing.report_csv(r, cfg()), f"{r.key}.csv", "text/csv")
+    start, end = taxes.period_for(form, year, n)
+    due = taxes.next_working_day(form.due(start, end))
+    choices = [(i, taxes.period_label(form, *taxes.period_for(form, year, i))) for i in allowed]
+    return render_template("books/tax_form.html", r=r, form=form, year=year, n=n, due=due,
+                           choices=choices, params={k: request.args.get(k, "") for k, _ in form.inputs},
+                           applies=form.applies(taxes.tax_settings(c)),
+                           years=range(today.year, today.year - 6, -1), cell=printing.cell_text)

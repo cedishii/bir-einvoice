@@ -1,6 +1,6 @@
 # PLAN — BIR e-Invoice prototype (Micronet Software Manila, Inc.)
 
-Status: **approved 2026-10-14.** Phases 1 to 4 built (phase 4, books of accounts, on 2026-10-15; section 7) (phase 3 requested by the user after phase 2; untested against the real sandbox until enrollment). Answers to the
+Status: **approved 2026-10-14.** Phases 1 to 5 built (books of accounts and tax return worksheets on 2026-10-15; sections 7 and 8) (phase 3 requested by the user after phase 2; untested against the real sandbox until enrollment). Answers to the
 open questions are in section 6.
 
 Main reference: `docs/EIS_SPEC_NOTES.md`. Its "Decisions" section is final.
@@ -281,3 +281,25 @@ registration details)**
   access control and an audit trail per user)?
 - The official SLSP DAT layout / RELIEF DEV module guide and the RDO's CAS
   registration checklist.
+
+## 8. Phase 5 — tax return worksheets and calendar (BUILT 2026-10-15)
+
+User, 2026-10-15, after comparing with taxumo.com: add worksheets for the returns
+Taxumo computes, the QAP / SAWT and a tax calendar; keep forms for individuals
+and non-VAT taxpayers available as options; leave out forms BIR has abolished
+(2550M, monthly 1601E). Nothing is filed or paid (no BIR connection).
+
+- `einvoice/books/taxes.py`: tax settings (in `settings`, keys `tax.*`), forms
+  registry with periods and due dates, worksheets as `Report`s (same screen /
+  PDF / CSV as the books), calendar.
+- Worksheets show figures, not the official form layout or line numbers.
+- 2550Q: output VAT from issued invoices, input VAT from posted bills; excess
+  input VAT carried over quarter to quarter (none refunded).
+- 1601EQ subtracts the months' 0619E amounts (assumed remitted in full).
+- 1702Q / 1702RT and 1701Q / 1701 / 1701A are cumulative for the year; earlier
+  quarters' tax is assumed paid as computed; creditable tax withheld = SAWT.
+  RCIT vs MCIT (rates in settings); accounts.is_cost (migration 7) marks cost
+  of sales / services for gross income. Individuals: graduated rates from 2023,
+  OSD 40% of sales, or 8% over PHP 250,000.
+- 1700: typed-in compensation and tax withheld (not from the books).
+- Not included: NOLCO, government VAT withholding, importations, 1601C (payroll).

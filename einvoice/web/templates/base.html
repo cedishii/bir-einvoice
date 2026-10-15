@@ -58,6 +58,9 @@
       <a href="{{ url_for('books.overview') }}" title="Books &amp; BIR reports"
          class="{{ 'active' if ep in ('books.overview', 'books.report') }}">
         <span class="icon">&#9783;</span><span class="label">Books &amp; reports</span></a>
+      <a href="{{ url_for('books.taxes_page') }}" title="Tax returns"
+         class="{{ 'active' if ep in ('books.taxes_page', 'books.tax_form') }}">
+        <span class="icon">&#9878;</span><span class="label">Tax returns</span></a>
       <a href="{{ url_for('books.accounts') }}" title="Setup"
          class="{{ 'active' if ep in ('books.accounts', 'books.suppliers', 'books.customers') }}">
         <span class="icon">&#9881;</span><span class="label">Accounts &amp; parties</span></a>

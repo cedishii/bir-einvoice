@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}{{ form.code }} worksheet{% endblock %}
+{% block content %}
+{% set args = dict(params, year=year, n=n) %}
+<div class="heading with-actions">
+  <div>
+    <h1>{{ r.title }}</h1>
+    <p class="muted">{{ r.period }} · Amounts in PHP · Due <strong>{{ due.strftime("%B %d, %Y") }}</strong>
+      {% if not applies %}<span class="badge cancelled">not applicable to the current setup</span>{% endif %}</p>
+  </div>
+  <div class="actions">
+    <a href="{{ url_for('books.taxes_page') }}">&larr; Tax returns</a>
+    <a class="button secondary" href="{{ url_for('books.tax_form', code=form.code, format='csv', **args) }}">CSV</a>
+    <a class="button" href="{{ url_for('books.tax_form', code=form.code, format='pdf', **args) }}" target="_blank"
+       data-window-title="{{ form.code }} worksheet">PDF / print</a>
+  </div>
+</div>
+
+<form method="get" class="card filters">
+  <label class="field"><span>Year</span>
+    <select name="year" onchange="this.form.submit()">{% for y in years %}<option {{ 'selected' if y == year }}>{{ y }}</option>{% endfor %}</select></label>
+  {% if choices | length > 1 %}
+  <label class="field"><span>{{ "Month" if form.period == "month" else "Quarter" }}</span>
+    <select name="n">{% for i, label in choices %}<option value="{{ i }}" {{ 'selected' if i == n }}>{{ label }}</option>{% endfor %}</select></label>
+  {% endif %}
+  {% for key, label in form.inputs %}
+  <label class="field"><span>{{ label }}</span><input name="{{ key }}" value="{{ params[key] }}" class="num" inputmode="decimal"></label>
+  {% endfor %}
+  <div class="quick"><button class="button secondary" type="submit">Show</button></div>
+</form>
+
+{% include "books/_table.html" %}
+{% endblock %}

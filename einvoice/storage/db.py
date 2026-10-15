@@ -261,6 +261,10 @@ MIGRATIONS = [
         detail  TEXT NOT NULL DEFAULT ''
     );
     """,
+    # 7: expense accounts that are cost of sales / services (income tax worksheets)
+    """
+    ALTER TABLE accounts ADD COLUMN is_cost INTEGER NOT NULL DEFAULT 0;
+    """,
 ]
 
 

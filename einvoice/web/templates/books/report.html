@@ -42,21 +42,5 @@
   </div>
 </form>
 
-<div class="scroll-x">
-<table class="grid compact">
-  <thead><tr>{% for c in r.columns %}<th class="{{ c.align }}">{{ c.label }}</th>{% endfor %}</tr></thead>
-  <tbody>
-  {% for row in r.rows %}
-    {% if row.kind == "group" %}
-      <tr class="group"><td colspan="{{ r.columns | length }}">{{ row.cells[0] }}</td></tr>
-    {% else %}
-      <tr class="{{ row.kind }}">{% for c in r.columns %}<td class="{{ c.align }}">{{ cell(row.cells[loop.index0]) }}</td>{% endfor %}</tr>
-    {% endif %}
-  {% else %}
-    <tr><td colspan="{{ r.columns | length }}" class="muted">No entries in this period.</td></tr>
-  {% endfor %}
-  </tbody>
-</table>
-</div>
-{% for n in r.notes %}<p class="muted">{{ n }}</p>{% endfor %}
+{% include "books/_table.html" %}
 {% endblock %}

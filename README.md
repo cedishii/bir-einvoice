@@ -5,7 +5,8 @@ zero-rated or VAT-exempt **Service Invoices**, mainly to clients in Japan, bille
 prints them as PDF, and exports each one as an e-invoice in BIR's Electronic
 Invoicing System (EIS) JSON format v2.1, checked by a built-in validator. It also
 keeps the **books of accounts** (journals, ledgers) and produces the BIR summary
-lists (SLS, SLP) and Form 2307 figures, as a computerized accounting system (CAS).
+lists (SLS, SLP), Form 2307 figures and **tax return worksheets** with a filing
+calendar, as a computerized accounting system (CAS).
 
 This is a **prototype**. The company is not required to use EIS yet. Until BIR
 issues the EIS Certification ID and PTU number, printed invoices carry a
@@ -17,6 +18,7 @@ issues the EIS Certification ID and PTU number, printed invoices carry a
 | 2 | EIS JSON export + validator | done |
 | 3 | Sign / encrypt / send to BIR, fetch results | built; needs EIS enrollment to use |
 | 4 | Books of accounts, SLS / SLP, Form 2307 data | built; RELIEF .DAT files wait for BIR's official layout |
+| 5 | Tax return worksheets, QAP / SAWT, tax calendar | built; nothing is filed from the app |
 
 ## Open it (Windows)
 
@@ -160,6 +162,33 @@ computerized books.
 Not built: the RELIEF `.DAT` files (BIR's validation module accepts only its
 exact layout, which we don't have yet) and printing the official Form 2307
 (the report gives its Part II figures).
+
+## Tax returns
+
+**Tax returns** shows a calendar of due dates (weekends move to Monday;
+holidays are not known) and a worksheet for each return. A worksheet gives the
+figures to copy onto the official form; nothing is filed or paid from the app.
+Each one opens on screen, as PDF and as CSV.
+
+| Form | What | Worksheet figures from |
+|---|---|---|
+| 2550Q | Quarterly VAT | SLS / SLP, input VAT carried over between quarters |
+| 0619E, 1601EQ, QAP | Expanded withholding (monthly, quarterly, alphalist of payees) | payments with tax withheld |
+| 1604E | Annual withholding information return | the same, per month and per payee |
+| SAWT | Tax withheld from Micronet by clients | collections with Forms 2307 |
+| 1702Q, 1702RT | Corporate income tax (cumulative), regular vs minimum corporate income tax | income and expense accounts |
+| 2551Q | Percentage tax (non-VAT only) | sales |
+| 1701Q, 1701, 1701A | Individuals: graduated rates with itemized deductions or OSD, or 8% | income and expense accounts |
+| 1700 | Individuals with compensation only | typed in from Form 2316 |
+
+The **tax settings** (on the same page) say whether the taxpayer is a
+corporation or an individual and VAT-registered or not, plus the income tax
+rates. Forms that don't apply are hidden from the calendar but still open, in
+case the setup changes. Mark cost-of-sales expense accounts on the **Accounts**
+page so gross income (for the minimum corporate income tax) is right.
+
+Not offered: 2550M (monthly VAT, no longer filed from 2023), the monthly 1601E
+(replaced by 0619E / 1601EQ), and 1601C (needs payroll).
 
 ## Settings (`.env`)
 

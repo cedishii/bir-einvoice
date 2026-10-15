@@ -28,6 +28,8 @@
       <td>{{ a.type }}</td>
       <td>{% if a.role %}<span class="badge vat">auto</span>{% endif %}
           {% if a.is_cash %}<span class="badge ex">cash</span>{% endif %}
+          {% if a.type == "expense" %}<label class="muted" title="Cost of sales / services: subtracted before gross income in the income tax worksheets">
+            <input type="checkbox" name="is_cost" value="1" form="acct-{{ a.code }}" {{ 'checked' if a.is_cost }} style="width:auto"> cost of sales</label>{% endif %}
           {% if a.code in used %}<small class="muted">in use</small>{% endif %}</td>
       <td><input type="checkbox" name="active" value="1" form="acct-{{ a.code }}" {{ 'checked' if a.active }} {{ 'disabled' if a.role }}>
           {% if a.role %}<input type="hidden" name="active" value="1" form="acct-{{ a.code }}">{% endif %}</td>
@@ -45,6 +47,7 @@
     <label class="field"><span>Type <em>*</em></span>
       <select name="type">{% for t in types %}<option>{{ t }}</option>{% endfor %}</select></label>
     <label class="field"><span>Cash / bank account</span><input type="checkbox" name="is_cash" value="1" style="width:auto"></label>
+    <label class="field"><span>Cost of sales / services</span><input type="checkbox" name="is_cost" value="1" style="width:auto"></label>
     <div class="quick"><button class="button" type="submit">Add account</button></div>
   </div>
 </form>
