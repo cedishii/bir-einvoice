@@ -181,7 +181,10 @@ def year_reports(conn: sqlite3.Connection, year: int) -> list[Report]:
     out += [reports.general_ledger(conn, start, end),
             reports.subsidiary_ledger(conn, "customer", start, end),
             reports.subsidiary_ledger(conn, "supplier", start, end),
-            reports.trial_balance(conn, end)]
+            reports.trial_balance(conn, end),
+            reports.income_statement(conn, start, end),
+            reports.balance_sheet(conn, end),
+            reports.monthly_summary(conn, start, end)]
     for q in range(4):
         qs, qe = reports.quarter_of(date(year, 3 * q + 1, 1))
         out += [reports.sls(conn, qs, qe), reports.slp(conn, qs, qe),

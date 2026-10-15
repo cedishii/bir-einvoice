@@ -42,7 +42,7 @@
       <label class="field {{ 'has-error' if errors.get('cash_account') }}">
         <span>Received into <em>*</em></span>
         <select name="cash_account">
-          {% for a in cash_accounts %}<option value="{{ a.code }}" {{ 'selected' if data.cash_account == a.code or (not data.cash_account and a.code == '1020') }}>{{ a.code }} {{ a.name }}</option>{% endfor %}
+          {% for a in cash_accounts %}<option value="{{ a.code }}" {{ 'selected' if data.cash_account == a.code or (not data.cash_account and a.code == default_cash) }}>{{ a.code }} {{ a.name }}</option>{% endfor %}
         </select>
       </label>
     </div>

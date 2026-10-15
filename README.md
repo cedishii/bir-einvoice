@@ -20,6 +20,7 @@ issues the EIS Certification ID and PTU number, printed invoices carry a
 | 4 | Books of accounts, SLS / SLP, Form 2307 data | built; RELIEF .DAT files wait for BIR's official layout |
 | 5 | Tax return worksheets, QAP / SAWT, tax calendar | built; nothing is filed from the app |
 | 6 | Sign-in per person, shared history (audit trail) of every entry and change | built |
+| 7 | Micronet's chart of accounts, Income Statement, Balance Sheet, income vs expenses | built |
 
 ## Open it (Windows)
 
@@ -70,14 +71,16 @@ Your mail provider gives you these:
 | Gmail / Google Workspace | `smtp.gmail.com` | 587 | `starttls` | Use an App Password, not the normal password |
 
 - With `EMAIL_AUTO_SEND=true`, the PDF goes to the client's e-mail as soon as
-  an invoice is issued. Each invoice page also has **E-mail to client** (or
-  **Send again**). Every e-mail is logged on the invoice.
+  an invoice is issued. Each invoice page also has **Send e-mail**: the
+  client's e-mail is filled in, and you can type other addresses (several,
+  separated by commas) and a Cc. Every e-mail is logged on the invoice.
+- Each e-mail ends with a note that it was sent automatically and needs no
+  reply, with the company's contact details.
 - `EMAIL_CC` / `EMAIL_BCC` put copies in other mailboxes, e.g. accounting.
 - If sending fails, the invoice is still issued, the error is shown and
   logged, and you can press **Send again**.
-- **Prototype mode:** while BIR's numbers are still placeholders, the PDF has
-  the PROTOTYPE watermark, so e-mails never go to clients. They go only to
-  `EMAIL_TEST_TO`, marked [TEST]. With no test address set, nothing is sent.
+- While BIR's numbers are still placeholders, the attached PDF still carries
+  the PROTOTYPE watermark.
 
 ### BIR e-invoice JSON
 
@@ -166,6 +169,38 @@ computerized books.
 Not built: the RELIEF `.DAT` files (BIR's validation module accepts only its
 exact layout, which we don't have yet) and printing the official Form 2307
 (the report gives its Part II figures).
+
+## Double-entry bookkeeping and the financial statements
+
+Every transaction is posted twice: a debit to one account and a credit to
+another, for the same amount. That is why the books always balance, and
+why the app can show both where money came from and where it went:
+
+| Example | Debit (+) | Credit (+) | Shows on |
+|---|---|---|---|
+| Invoice a client PHP 500,000 (earned) | Accounts receivable - trade | Service income | Income Statement (income) and Balance Sheet (receivable) |
+| Borrow PHP 500,000 from a bank | Cash in bank | Loans payable | Balance Sheet only: an asset and a liability, not income |
+| Pay PHP 80,000 office rent | Rent -Office | Cash in bank | Income Statement (expense) and Balance Sheet (less cash) |
+
+**Books & reports** shows income, expenses and net income for the year so
+far, and:
+- **Income Statement**: revenue, cost of services, gross profit, operating
+  expenses, other income and expenses, income tax, net income (loss).
+- **Balance Sheet**: assets = liabilities + equity, as of a date, with the
+  year's earnings not yet closed to retained earnings.
+- **Income vs Expenses by Month**.
+
+All three are in the year-end archive too.
+
+**Chart of accounts.** The code has a generic starter chart. The company's
+own chart is a local file, `data\chart_of_accounts.csv` (never committed),
+with the columns `code, name, type, section, flags`; the app applies it on
+start whenever it changes, and records that in the history. Codes: 1xxxx
+assets, 2xxxx liabilities, 3xxxx equity, 4xxxx income, 5xxxx cost of
+services, 6xxxx expenses. The flags are explained in `einvoice/books/chart.py`.
+Accounts flagged *excluded from income tax* (provisions for income tax,
+penalties, unrealized forex, interest income under final tax) stay out of the
+income tax worksheets.
 
 ## Tax returns
 

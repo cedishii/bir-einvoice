@@ -29,8 +29,8 @@ def test_issuing_posts_to_the_sales_journal(repo):
     inv = repo.issue(make_invoice())
     e = ledger.entry_for(repo.conn, "invoice", inv.id)
     assert (e["book"], e["entry_no"], e["reference"]) == ("SJ", 1, "SI 0001773")
-    assert lines_of(repo.conn, e["id"]) == [("1100", D("4560000.00"), D("0")),
-                                            ("4000", D("0"), D("4560000.00"))]
+    assert lines_of(repo.conn, e["id"]) == [("11110", D("4560000.00"), D("0")),
+                                            ("41010", D("0"), D("4560000.00"))]
     c = repo.conn.execute("SELECT * FROM customers").fetchone()
     assert c["name"] == "MICRONET CO. LTD." and e["party_id"] == c["id"]
 
@@ -38,9 +38,9 @@ def test_issuing_posts_to_the_sales_journal(repo):
 def test_vatable_invoice_credits_output_vat(repo):
     inv = repo.issue(make_invoice(trans_class=VATABLE))
     e = ledger.entry_for(repo.conn, "invoice", inv.id)
-    assert lines_of(repo.conn, e["id"]) == [("1100", D("5107200.00"), D("0")),
-                                            ("4000", D("0"), D("4560000.00")),
-                                            ("2100", D("0"), D("547200.00"))]
+    assert lines_of(repo.conn, e["id"]) == [("11110", D("5107200.00"), D("0")),
+                                            ("41010", D("0"), D("4560000.00")),
+                                            ("21210", D("0"), D("547200.00"))]
 
 
 def test_void_posts_a_reversal(repo):
@@ -48,8 +48,8 @@ def test_void_posts_a_reversal(repo):
     repo.void(inv.control_no, "Wrong client")
     rev = ledger.reversal_of(repo.conn, ledger.entry_for(repo.conn, "invoice", inv.id)["id"])
     assert rev["book"] == "GJ" and "Wrong client" in rev["particulars"]
-    assert lines_of(repo.conn, rev["id"]) == [("1100", D("0"), D("4560000.00")),
-                                              ("4000", D("4560000.00"), D("0"))]
+    assert lines_of(repo.conn, rev["id"]) == [("11110", D("0"), D("4560000.00")),
+                                              ("41010", D("4560000.00"), D("0"))]
     assert postings.invoice_balance(repo.conn, inv.id) == 0
 
 
@@ -77,8 +77,8 @@ def test_verify_detects_tampering(repo):
 def test_unbalanced_entry_is_refused(repo):
     with pytest.raises(BooksError, match="does not balance"):
         postings.create_manual_entry(repo.conn, entry_date=date(2024, 11, 1), reference="",
-                                     particulars="x", lines=[Line("1020", debit=D("10")),
-                                                             Line("3000", credit=D("9"))])
+                                     particulars="x", lines=[Line("11040", debit=D("10")),
+                                                             Line("31010", credit=D("9"))])
     assert repo.conn.execute("SELECT COUNT(*) FROM journal_entries").fetchone()[0] == 0
 
 
@@ -86,13 +86,13 @@ def test_manual_entries_go_to_the_right_book(repo):
     conn = repo.conn
     capital = postings.create_manual_entry(
         conn, entry_date=date(2024, 10, 1), reference="DS-1", particulars="Capital paid in",
-        lines=[Line("1020", debit=D("100000")), Line("3000", credit=D("100000"))])
+        lines=[Line("11040", debit=D("100000")), Line("31010", credit=D("100000"))])
     rent = postings.create_manual_entry(
         conn, entry_date=date(2024, 10, 5), reference="CV-1", particulars="October rent",
-        lines=[Line("5100", debit=D("30000")), Line("1020", credit=D("30000"))])
+        lines=[Line("61270", debit=D("30000")), Line("11040", credit=D("30000"))])
     accrual = postings.create_manual_entry(
         conn, entry_date=date(2024, 10, 31), reference="", particulars="Depreciation",
-        lines=[Line("5990", debit=D("500")), Line("1500", credit=D("500"))])
+        lines=[Line("61190", debit=D("500")), Line("12120", credit=D("500"))])
     books = [ledger.entry(conn, i)["book"] for i in (capital, rent, accrual)]
     assert books == ["CRJ", "CDJ", "GJ"]
     rev = postings.reverse_manual(conn, rent, "Paid twice")
@@ -133,14 +133,14 @@ def test_collection_with_withholding_and_fx_loss(repo):
     cid = postings.create_collection(
         conn, customer_id=cust, invoice_id=inv.id, coll_date=date(2024, 12, 10),
         reference="OR 501", applied=D("5107200.00"), cash=D("5000000.00"),
-        cash_account="1020", cwt=D("91200.00"), atc="wc160", cwt_base=D("4560000.00"),
+        cash_account="11040", cwt=D("91200.00"), atc="wc160", cwt_base=D("4560000.00"),
         cwt_rate=D("2"))
     e = ledger.entry_for(conn, "collection", cid)
     assert e["book"] == "CRJ"
-    assert lines_of(conn, e["id"]) == [("1020", D("5000000.00"), D("0")),
-                                       ("1210", D("91200.00"), D("0")),
-                                       ("1100", D("0"), D("5107200.00")),
-                                       ("5900", D("16000.00"), D("0"))]
+    assert lines_of(conn, e["id"]) == [("11040", D("5000000.00"), D("0")),
+                                       ("11140", D("91200.00"), D("0")),
+                                       ("11110", D("0"), D("5107200.00")),
+                                       ("62030", D("16000.00"), D("0"))]
     assert postings.invoice_balance(conn, inv.id) == 0
     with pytest.raises(ValueError, match="collections recorded"):
         repo.void(inv.control_no, "x")
@@ -154,12 +154,12 @@ def test_collection_fx_gain_and_limits(repo):
     with pytest.raises(BooksError, match="only 4,560,000.00 left"):
         postings.create_collection(conn, customer_id=cust, invoice_id=inv.id,
                                    coll_date=date(2024, 12, 1), reference="R1",
-                                   applied=D("5000000"), cash=D("5000000"), cash_account="1020")
+                                   applied=D("5000000"), cash=D("5000000"), cash_account="11040")
     cid = postings.create_collection(conn, customer_id=cust, invoice_id=inv.id,
                                      coll_date=date(2024, 12, 1), reference="R1",
-                                     applied=D("4560000"), cash=D("4600000"), cash_account="1020")
+                                     applied=D("4560000"), cash=D("4600000"), cash_account="11040")
     e = ledger.entry_for(conn, "collection", cid)
-    assert ("4100", D("0"), D("40000.00")) in lines_of(conn, e["id"])
+    assert ("42030", D("0"), D("40000.00")) in lines_of(conn, e["id"])
     postings.cancel(conn, "collection", cid, "Bounced")
     assert postings.invoice_balance(conn, inv.id) == D("4560000.00")
     assert ledger.reversal_of(conn, e["id"]) is not None
@@ -170,22 +170,22 @@ def test_bill_and_payment_with_expanded_withholding(repo):
     sid = supplier(conn)
     bid = postings.create_bill(conn, supplier_id=sid, bill_date=date(2024, 11, 3),
                                supplier_ref="SI 88", description="Office rent November",
-                               account_code="5100", category="services",
+                               account_code="61270", category="services",
                                net=D("50000"), vat=D("6000"))
     e = ledger.entry_for(conn, "bill", bid)
     assert e["book"] == "PJ"
-    assert lines_of(conn, e["id"]) == [("5100", D("50000.00"), D("0")),
-                                       ("1200", D("6000.00"), D("0")),
-                                       ("2000", D("0"), D("56000.00"))]
+    assert lines_of(conn, e["id"]) == [("61270", D("50000.00"), D("0")),
+                                       ("11410", D("6000.00"), D("0")),
+                                       ("21010", D("0"), D("56000.00"))]
     pid = postings.create_payment(conn, supplier_id=sid, bill_id=bid, pay_date=date(2024, 11, 5),
-                                  reference="CHK 1001", amount=D("56000"), cash_account="1020",
+                                  reference="CHK 1001", amount=D("56000"), cash_account="11040",
                                   ewt=D("2500"), atc="WI100", ewt_base=D("50000"),
                                   ewt_rate=D("5"))
     p = ledger.entry_for(conn, "payment", pid)
     assert p["book"] == "CDJ"
-    assert lines_of(conn, p["id"]) == [("2000", D("56000.00"), D("0")),
-                                       ("1020", D("0"), D("53500.00")),
-                                       ("2200", D("0"), D("2500.00"))]
+    assert lines_of(conn, p["id"]) == [("21010", D("56000.00"), D("0")),
+                                       ("11040", D("0"), D("53500.00")),
+                                       ("21250", D("0"), D("2500.00"))]
     assert postings.bill_balance(conn, bid) == 0
     with pytest.raises(BooksError, match="payments recorded"):
         postings.cancel(conn, "bill", bid, "x")
@@ -195,11 +195,11 @@ def test_bill_rules(repo):
     conn = repo.conn
     sid = supplier(conn)
     base = dict(supplier_id=sid, bill_date=date(2024, 11, 3), supplier_ref="1",
-                description="Books", account_code="5500", net=D("100"))
+                description="Books", account_code="61200", net=D("100"))
     with pytest.raises(BooksError, match="no input VAT"):
         postings.create_bill(conn, category="exempt", vat=D("12"), **base)
     with pytest.raises(BooksError, match="expense or asset account"):
-        postings.create_bill(conn, category="goods", vat=D("12"), **base | {"account_code": "1200"})
+        postings.create_bill(conn, category="goods", vat=D("12"), **base | {"account_code": "11410"})
     with pytest.raises(BooksError, match="future"):
         postings.create_bill(conn, category="goods", vat=D("12"),
                              **base | {"bill_date": date(today_ph().year + 1, 1, 1)})
@@ -211,8 +211,8 @@ def test_closed_period(repo):
         ledger.close_through(conn, date(2024, 11, 30))
     with pytest.raises(BooksError, match="closed through 2024-11-30"):
         postings.create_manual_entry(conn, entry_date=date(2024, 11, 30), reference="",
-                                     particulars="x", lines=[Line("1020", debit=D("1")),
-                                                             Line("3000", credit=D("1"))])
+                                     particulars="x", lines=[Line("11040", debit=D("1")),
+                                                             Line("31010", credit=D("1"))])
     with pytest.raises(BooksError, match="closed"):
         repo.issue(make_invoice())
     assert repo.next_control_no() == "0001773"  # the number was not used up
@@ -229,18 +229,18 @@ def _sample_books(repo):
     cust = conn.execute("SELECT customer_id FROM invoices").fetchone()[0]
     postings.create_collection(conn, customer_id=cust, invoice_id=a.id,
                                coll_date=date(2024, 12, 10), reference="OR 1",
-                               applied=D("1000000"), cash=D("980000"), cash_account="1020",
+                               applied=D("1000000"), cash=D("980000"), cash_account="11040",
                                cwt=D("20000"), atc="WC160", cwt_base=D("1000000"),
                                cwt_rate=D("2"))
     sid = supplier(conn)
     bid = postings.create_bill(conn, supplier_id=sid, bill_date=date(2024, 10, 15),
-                               supplier_ref="88", description="Rent", account_code="5100",
+                               supplier_ref="88", description="Rent", account_code="61270",
                                category="services", net=D("50000"), vat=D("6000"))
     postings.create_bill(conn, supplier_id=sid, bill_date=date(2024, 11, 15),
-                         supplier_ref="89", description="Books", account_code="5500",
+                         supplier_ref="89", description="Books", account_code="61200",
                          category="exempt", net=D("1000"), vat=D("0"))
     postings.create_payment(conn, supplier_id=sid, bill_id=bid, pay_date=date(2024, 11, 5),
-                            reference="CHK 1", amount=D("56000"), cash_account="1020",
+                            reference="CHK 1", amount=D("56000"), cash_account="11040",
                             ewt=D("2500"), atc="WI100", ewt_base=D("50000"), ewt_rate=D("5"))
     return conn
 
@@ -252,11 +252,11 @@ def test_trial_balance_and_ledgers(repo):
     assert total[3] == total[4] and not tb.notes
     by_code = {r.cells[0]: r.cells[3:] for r in tb.rows[:-1]}
     # AR: 5,107,200 + 4,560,000 - 1,000,000
-    assert by_code["1100"] == [D("8667200.00"), None]
-    assert by_code["2100"] == [None, D("547200.00")]
-    assert by_code["2000"] == [None, D("1000.00")]
+    assert by_code["11110"] == [D("8667200.00"), None]
+    assert by_code["21210"] == [None, D("547200.00")]
+    assert by_code["21010"] == [None, D("1000.00")]
 
-    gl = reports.general_ledger(conn, *Q4, account="1020")
+    gl = reports.general_ledger(conn, *Q4, account="11040")
     assert gl.rows[-1].cells[-2:] == [D("926500.00"), None]  # 980,000 - 53,500
     ar = reports.subsidiary_ledger(conn, "customer", *Q4)
     assert ar.rows[-1].cells[-1] == D("8667200.00")
@@ -301,7 +301,7 @@ def test_pdf_csv_and_year_archive(repo, config):
 def test_opening_balances_go_to_the_general_journal(repo):
     eid = postings.create_manual_entry(
         repo.conn, entry_date=date(2024, 10, 1), reference="", particulars="Opening balances",
-        lines=[Line("1020", debit=D("2000000")), Line("3000", credit=D("2000000"))],
+        lines=[Line("11040", debit=D("2000000")), Line("31010", credit=D("2000000"))],
         opening=True)
     e = ledger.entry(repo.conn, eid)
     assert (e["book"], e["source_type"]) == ("GJ", "opening")

@@ -11,7 +11,7 @@ from flask import (Blueprint, Response, abort, current_app, flash, redirect, ren
                    request, url_for)
 
 from .. import money
-from ..books import ledger, postings, printing, reports, taxes
+from ..books import chart, ledger, postings, printing, reports, taxes
 from ..books.ledger import BooksError, Line
 from ..books.postings import PURCHASE_CATEGORIES
 from ..models import parse_tin, today_ph
@@ -23,6 +23,7 @@ REPORTS = {
     "CDJ": "Cash Disbursements Journal", "GJ": "General Journal",
     "gl": "General Ledger", "ar": "Accounts Receivable Subsidiary Ledger",
     "ap": "Accounts Payable Subsidiary Ledger", "tb": "Trial Balance",
+    "is": "Income Statement", "bs": "Balance Sheet", "monthly": "Income vs Expenses by Month",
     "sls": "Summary List of Sales", "slp": "Summary List of Purchases",
     "wt-issued": "Tax withheld from suppliers (Form 2307 to issue)",
     "wt-received": "Tax withheld by clients (Form 2307 received)",
@@ -105,7 +106,12 @@ def overview():
     start, end = _period()
     counts = {k: c.execute("SELECT COUNT(*) FROM journal_entries WHERE book = ?",
                            (k,)).fetchone()[0] for k in ledger.BOOKS}
+    ytd_start = date(today.year, 1, 1)
+    totals = {"income": reports.income_total(c, ytd_start, today),
+              "expenses": reports.expense_total(c, ytd_start, today)}
+    totals["net"] = totals["income"] - totals["expenses"]
     return render_template("books/overview.html", reports=REPORTS, quarterly=QUARTERLY,
+                           totals=totals, today=today,
                            start=start, end=end, counts=counts,
                            problems=ledger.verify(c), audit_problems=ledger.verify_audit(c),
                            audit_rows=c.execute("SELECT COUNT(*) FROM audit_log").fetchone()[0],
@@ -152,7 +158,7 @@ def report(key):
                            party=party, account=account, parties=parties,
                            accounts=ledger.accounts(c), quarterly=key in QUARTERLY,
                            quarters=_quarters(start.year), cell=printing.cell_text,
-                           as_of=key == "tb", audit_filters=_audit_filters(c) if key == "audit" else None)
+                           as_of=key in ("tb", "bs"), audit_filters=_audit_filters(c) if key == "audit" else None)
 
 
 def _audit_filters(c) -> dict:
@@ -173,6 +179,12 @@ def _build(c, key, start, end, party, account):
         return reports.subsidiary_ledger(c, "customer", start, end, party)
     if key == "ap":
         return reports.subsidiary_ledger(c, "supplier", start, end, party)
+    if key == "is":
+        return reports.income_statement(c, start, end)
+    if key == "bs":
+        return reports.balance_sheet(c, end)
+    if key == "monthly":
+        return reports.monthly_summary(c, start, end)
     if key == "tb":
         return reports.trial_balance(c, end)
     if key == "sls":
@@ -336,7 +348,13 @@ def _collection_form(data, errors=None, status=200):
     return render_template("books/collection_form.html", data=data, errors=errors or {},
                            invoices=postings.open_invoices(c),
                            customers=c.execute("SELECT id, name FROM customers ORDER BY name").fetchall(),
-                           cash_accounts=ledger.cash_accounts(c)), status
+                           cash_accounts=ledger.cash_accounts(c),
+                           default_cash=_default_cash(c)), status
+
+
+def _default_cash(c) -> str:
+    row = c.execute("SELECT code FROM accounts WHERE role = 'bank' AND active = 1").fetchone()
+    return row["code"] if row else ""
 
 
 @bp.get("/collections/new")
@@ -444,6 +462,7 @@ def _payment_form(data, errors=None, status=200):
     c = conn()
     return render_template("books/payment_form.html", data=data, errors=errors or {},
                            bills=postings.open_bills(c), cash_accounts=ledger.cash_accounts(c),
+                           default_cash=_default_cash(c),
                            suppliers=c.execute("SELECT id, name FROM suppliers ORDER BY name").fetchall()), status
 
 
@@ -502,7 +521,8 @@ def accounts():
     c = conn()
     used = {r[0] for r in c.execute("SELECT DISTINCT account_code FROM journal_lines")}
     return render_template("books/accounts.html", accounts=ledger.accounts(c), used=used,
-                           types=ledger.ACCOUNT_TYPES)
+                           types=ledger.ACCOUNT_TYPES, sections=chart.SECTIONS,
+                           order=chart.STATEMENT_ORDER)
 
 
 @bp.post("/accounts")
@@ -513,6 +533,8 @@ def add_account():
     kind = request.form.get("type", "")
     is_cash = 1 if request.form.get("is_cash") else 0
     is_cost = 1 if request.form.get("is_cost") else 0
+    tax_exclude = 1 if request.form.get("tax_exclude") else 0
+    section = request.form.get("section", "")
     try:
         if not (code.isdigit() and 3 <= len(code) <= 8):
             raise BooksError("The account code must be 3 to 8 digits.")
@@ -524,12 +546,17 @@ def add_account():
             raise BooksError("Only an asset account can be a cash / bank account.")
         if is_cost and kind != "expense":
             raise BooksError("Only an expense account can be cost of sales / services.")
+        if section not in chart.SECTIONS[kind]:
+            section = chart.default_section(kind)
+        if kind == "expense" and section == "Cost of services":
+            is_cost = 1
         if c.execute("SELECT 1 FROM accounts WHERE code = ?", (code,)).fetchone():
             raise BooksError(f"Account {code} already exists.")
         with postings.transaction(c):
-            c.execute("INSERT INTO accounts (code, name, type, is_cash, is_cost) VALUES (?,?,?,?,?)",
-                      (code, name, kind, is_cash, is_cost))
-            ledger.audit(c, "add account", f"{code} {name} ({kind})", entity="account",
+            c.execute("INSERT INTO accounts (code, name, type, section, is_cash, is_cost, "
+                      "tax_exclude) VALUES (?,?,?,?,?,?,?)",
+                      (code, name, kind, section, is_cash, is_cost, tax_exclude))
+            ledger.audit(c, "add account", f"{code} {name} ({kind}, {section})", entity="account",
                          entity_id=code)
         flash(f"Account {code} {name} added.")
     except BooksError as e:
@@ -546,15 +573,21 @@ def update_account(code):
     name = " ".join(request.form.get("name", a["name"]).split()) or a["name"]
     active = 1 if request.form.get("active") else 0
     is_cost = 1 if request.form.get("is_cost") and a["type"] == "expense" else 0
+    tax_exclude = 1 if request.form.get("tax_exclude") else 0
+    section = request.form.get("section", a["section"])
+    if section not in chart.SECTIONS[a["type"]]:
+        section = a["section"]
     if a["role"] and not active:
         flash(f"{code} {a['name']} is used by the automatic postings and stays active.", "error")
         return redirect(url_for("books.accounts"))
     with postings.transaction(c):
-        c.execute("UPDATE accounts SET name = ?, active = ?, is_cost = ? WHERE code = ?",
-                  (name, active, is_cost, code))
+        after = {"name": name, "active": active, "is_cost": is_cost, "section": section,
+                 "tax_exclude": tax_exclude}
+        c.execute("UPDATE accounts SET name = ?, active = ?, is_cost = ?, section = ?, "
+                  "tax_exclude = ? WHERE code = ?",
+                  (name, active, is_cost, section, tax_exclude, code))
         ledger.audit(c, "change account", f"{code} {name}", entity="account", entity_id=code,
-                     changes=ledger.changed(dict(a), {"name": name, "active": active,
-                                                      "is_cost": is_cost}))
+                     changes=ledger.changed(dict(a), after))
     flash(f"Account {code} saved.")
     return redirect(url_for("books.accounts"))
 

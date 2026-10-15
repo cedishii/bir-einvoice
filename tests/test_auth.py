@@ -113,9 +113,9 @@ def test_changes_keep_before_and_after(app, conn):
     row = audit_rows(conn, action="change supplier")[0]
     assert json.loads(row["changes"]) == {"name": ["ACME", "ACME INC."],
                                           "address": ["Makati", "Pasig"]}
-    c.post("/accounts/5100", data={"name": "Office Rent", "active": "1"})
+    c.post("/accounts/61270", data={"name": "Office Rent", "active": "1"})
     assert json.loads(audit_rows(conn, action="change account")[0]["changes"]) == {
-        "name": ["Rent Expense", "Office Rent"]}
+        "name": ["Rent", "Office Rent"]}
     page = c.get("/books/report/audit?from=2000-01-01").get_data(as_text=True)
     assert "name: ACME -&gt; ACME INC." in page
 
@@ -124,7 +124,7 @@ def test_nothing_can_be_deleted_and_the_history_is_sealed(repo):
     conn = repo.conn
     repo.issue(make_invoice())
     for sql in ("DELETE FROM invoices", "DELETE FROM invoice_lines", "DELETE FROM customers",
-                "DELETE FROM accounts WHERE code = '5990'", "DELETE FROM audit_log",
+                "DELETE FROM accounts WHERE code = '61190'", "DELETE FROM audit_log",
                 "UPDATE audit_log SET user = 'someone else'", "UPDATE invoice_lines SET qty = '2'"):
         with pytest.raises(sqlite3.IntegrityError):
             conn.execute(sql)

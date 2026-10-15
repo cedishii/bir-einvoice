@@ -184,20 +184,24 @@ def _total(rows, key) -> Decimal:
 
 
 def income_statement(conn, start: date, end: date) -> dict[str, Decimal]:
-    """Income and expense account movements in a period.
+    """Income and expense account movements in a period, for income tax.
 
-    revenue: the sales account; other_income: other income accounts;
-    cost: expense accounts marked "cost of sales / services"; expenses: the rest."""
+    revenue: "Revenue" accounts; other_income: other income accounts;
+    cost: expense accounts marked cost of sales / services; expenses: the
+    rest. Accounts marked "excluded from income tax" (provisions for income
+    tax, penalties, unrealized forex, interest income under final tax) are
+    left out."""
     out = {"revenue": ZERO, "other_income": ZERO, "cost": ZERO, "expenses": ZERO}
     rows = conn.execute(
-        """SELECT a.type, a.role, a.is_cost, l.debit, l.credit FROM journal_lines l
+        """SELECT a.type, a.section, a.is_cost, l.debit, l.credit FROM journal_lines l
            JOIN journal_entries e ON e.id = l.entry_id JOIN accounts a ON a.code = l.account_code
-           WHERE a.type IN ('income', 'expense') AND e.entry_date BETWEEN ? AND ?""",
+           WHERE a.type IN ('income', 'expense') AND a.tax_exclude = 0
+             AND e.entry_date BETWEEN ? AND ?""",
         (start.isoformat(), end.isoformat()))
     for r in rows:
         net = Decimal(r["debit"]) - Decimal(r["credit"])
         if r["type"] == "income":
-            out["revenue" if r["role"] == "sales" else "other_income"] -= net
+            out["revenue" if r["section"] == "Revenue" else "other_income"] -= net
         else:
             out["cost" if r["is_cost"] else "expenses"] += net
     return out
@@ -475,10 +479,11 @@ def _corp_sheet(key, title, conn, settings, start, end, prior_quarters: int) -> 
     payable = t["tax"] - t["cwt"] - paid
     _line(r, "Tax payable" if payable >= 0 else "Overpayment", abs(payable), "total")
     r.notes += [COMMON_NOTE,
-                "Deductions are every expense account except those marked cost of sales / services. "
-                "Book income tax itself, non-deductible expenses and closing entries so they don't "
-                "reach these accounts, or adjust the figures.",
-                "Not included: NOLCO, special deductions, tax relief and income subject to final tax."]
+                "Deductions are the expense accounts other than cost of sales / services. Accounts "
+                "marked \"excluded from income tax\" in the chart of accounts are left out "
+                "(provisions for income tax, penalties, unrealized forex, interest income under "
+                "final tax).",
+                "Not included: NOLCO, special deductions and tax relief."]
     if settings["taxpayer"] != "corporation":
         r.notes.insert(0, "The tax settings say individual: this return does not apply.")
     return r

@@ -338,3 +338,26 @@ actions; no per-record history. Kept: hash-chained history, no deletions,
 before / after values, lockout after 5 wrong passwords, 30-minute idle
 sign-out, daily backups. The users.role / must_change columns from migration
 8 stay but are unused (role is always "admin").
+
+## 10. Phase 7 — the company's chart of accounts and financial statements (BUILT 2026-10-15)
+
+User: introduce double-entry bookkeeping to see income vs expenses (example:
+PHP 500k received as a loan is an asset and a loans-payable liability), and use
+the company's chart of accounts (a spreadsheet in data/, gitignored). The
+user: the company's data stays out of the public repo; only UI and logic are
+pushed.
+
+- The ledger was already double entry; added the statements that show it:
+  Income Statement, Balance Sheet (with unclosed current earnings), Income vs
+  Expenses by Month, and a year-to-date income / expenses / net card.
+- `einvoice/books/chart.py`: a generic starter chart (5-digit codes, types,
+  statement sections, flags cash / role / cost / tax_exclude), installed by
+  migration 9 (which adds accounts.section and accounts.tax_exclude; older
+  accounts already used stay, inactive). The company's chart is the local
+  file `data/chart_of_accounts.csv` (made from the spreadsheet, codes and
+  sections assigned), applied on connect when its SHA-256 changes: accounts
+  added or updated, unlisted ones deactivated, recorded in the history.
+  Default bank for forms: role "bank".
+- Tax worksheets: revenue = "Revenue" section, tax_exclude accounts left out.
+- Not built: inventory (the chart has no inventory accounts; Micronet sells
+  services).

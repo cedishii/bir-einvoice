@@ -30,7 +30,7 @@ def build(inv: Invoice, cfg: Config) -> dict:
         {
             "Nm": line.item_name,
             "Desc": line.description,
-            "Qty": Num.qty(line.qty),
+            "Qty": Num.qty(line.billed_qty),
             "Unit": line.unit,
             "UnitCost": A(line.unit_cost_php),
             "SalesAmt": A(line.sales_php),
@@ -38,7 +38,7 @@ def build(inv: Invoice, cfg: Config) -> dict:
             "SpeDscntAmt": A(ZERO),
             "NetSales": A(line.sales_php),
         }
-        for line in inv.lines
+        for line in inv.items  # text-only lines carry no sale
     ]
     total = inv.total_php
     return {

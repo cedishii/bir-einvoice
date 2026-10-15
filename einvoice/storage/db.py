@@ -7,6 +7,8 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
+from ..books.chart import install_sql as chart_sql
+
 MIGRATIONS = [
     # 1: invoices, lines and the control-number counter
     """
@@ -332,6 +334,10 @@ MIGRATIONS = [
     CREATE TRIGGER users_no_delete BEFORE DELETE ON users
     BEGIN SELECT RAISE(ABORT, 'Users are never deleted; deactivate them instead.'); END;
     """,
+    # 9: statement sections per account (balance sheet / income statement),
+    # the income-tax exclusions, and the starter chart. The company's own
+    # chart is applied from a local file (books/chart.py).
+    chart_sql(),
 ]
 
 
@@ -345,6 +351,8 @@ def connect(path: Path) -> sqlite3.Connection:
     from ..books import ledger, postings  # the books need the schema above
     postings.sync(conn)
     ledger.seal_audit(conn)  # rows written before the audit trail was hashed
+    from ..books import chart
+    chart.apply_local(conn, path.parent / chart.LOCAL_FILE)  # the company's own chart
     return conn
 
 

@@ -9,7 +9,7 @@ from tests.test_form import form
 from tests.conftest import sign_in
 
 SETTINGS = EmailSettings(host="smtp.example.com", from_addr="billing@micronet.example",
-                         cc=("accounting@micronet.example",), test_to="me@micronet.example")
+                         cc=("accounting@micronet.example",))
 
 
 class Outbox(list):
@@ -26,32 +26,33 @@ def test_message_contents(repo, config):
     out = Outbox()
     result = emailer.send_invoice(repo.conn, inv, real(config), SETTINGS, sender=out)
     msg = out[0]
-    assert result.sent and not result.test
+    assert result.sent
     assert msg["To"] == "ap@micronet.co.jp" and msg["Cc"] == "accounting@micronet.example"
+    assert msg["Auto-Submitted"] == "auto-generated"
     assert msg["Subject"] == "Service Invoice No. 0001773 - MICRONET SOFTWARE MANILA, INC."
     body = msg.get_body(("plain",)).get_content()
     assert "JPY 12,000,000.00" in body and "PHP 4,560,000.00" in body
+    assert "automatically generated e-mail. Please do not reply" in body
+    assert "[TEST]" not in msg["Subject"] and "TEST e-mail" not in body
     [pdf] = list(msg.iter_attachments())
     assert pdf.get_filename() == "Service-Invoice-0001773.pdf"
     assert pdf.get_content().startswith(b"%PDF")
 
 
-def test_prototype_mode_only_mails_the_test_address(repo, config):
+def test_typed_recipients_and_cc(repo, config):
+    """Any addresses can be typed, even in prototype mode (no test-only mode)."""
     inv = repo.issue(make_invoice(buyer_email="ap@micronet.co.jp"))
     out = Outbox()
-    result = emailer.send_invoice(repo.conn, inv, config, SETTINGS, sender=out)
-    assert result.test and out[0]["To"] == "me@micronet.example"
-    assert out[0]["Subject"].startswith("[TEST] ") and out[0]["Cc"] is None
-    assert "ap@micronet.co.jp" in out[0].get_body(("plain",)).get_content()
-
-
-def test_prototype_without_test_address_sends_nothing(repo, config):
-    from dataclasses import replace
-    inv = repo.issue(make_invoice(buyer_email="ap@micronet.co.jp"))
-    out = Outbox()
-    with pytest.raises(EmailError, match="EMAIL_TEST_TO"):
-        emailer.send_invoice(repo.conn, inv, config, replace(SETTINGS, test_to=""), sender=out)
-    assert out == []
+    result = emailer.send_invoice(repo.conn, inv, config, SETTINGS, sender=out,
+                                  to="boss@client.jp; ap@micronet.co.jp", cc="me@micronet.example")
+    assert out[0]["To"] == "boss@client.jp, ap@micronet.co.jp"
+    assert out[0]["Cc"] == "me@micronet.example, accounting@micronet.example"
+    assert result.message.startswith("E-mailed to boss@client.jp, ap@micronet.co.jp")
+    with pytest.raises(EmailError, match="not a valid e-mail address: nope"):
+        emailer.send_invoice(repo.conn, inv, config, SETTINGS, sender=out, to="nope")
+    with pytest.raises(EmailError, match="Enter at least one"):
+        emailer.send_invoice(repo.conn, inv, config, SETTINGS, sender=out, to=" ")
+    assert len(out) == 1
 
 
 def test_refuses_without_settings_or_address(repo, config):
@@ -128,8 +129,8 @@ def test_no_auto_send_when_off(config):
     c = app_client(real(config), SETTINGS, out)
     c.post("/invoices/issue", data=form(buyer_email="ap@micronet.co.jp") | {"token": "e2"})
     assert out == []
-    c.post("/invoices/0001773/email")
-    assert len(out) == 1
+    c.post("/invoices/0001773/email", data={"to": "other@client.jp", "cc": ""})
+    assert len(out) == 1 and out[0]["To"] == "other@client.jp"
     assert "Send again" in c.get("/invoices/0001773").get_data(as_text=True)
 
 

@@ -24,16 +24,20 @@
   </thead>
   <tbody>
   {% for line in inv.lines %}
+    {% if line.is_text %}
+    <tr><td></td><td colspan="7">{{ line.description }}</td></tr>
+    {% else %}
     <tr>
-      <td>{{ loop.index }}</td>
+      <td>{{ (inv.items.index(line)) + 1 }}</td>
       <td><strong>{{ line.item_name }}</strong><br>{{ line.description }}</td>
-      <td class="num">{{ fmt_qty(line.qty) }}</td>
+      <td class="num">{{ fmt_qty(line.qty) if line.qty is not none else "" }}</td>
       <td>{{ line.unit }}</td>
       <td class="num">{{ fmt(line.unit_cost_jpy) }}</td>
       <td class="num">{{ fmt(line.amount_jpy) }}</td>
       <td class="num">{{ fmt(line.unit_cost_php) }}</td>
       <td class="num">{{ fmt(line.sales_php) }}</td>
     </tr>
+    {% endif %}
   {% endfor %}
   </tbody>
   <tfoot>

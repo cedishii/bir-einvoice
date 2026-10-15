@@ -37,7 +37,7 @@
          class="{{ 'active' if ep in ('index', 'show_invoice', 'test_export_invoice') }}">
         <span class="icon">&#9776;</span><span class="label">Invoices</span></a>
       <a href="{{ url_for('new_invoice') }}" title="New invoice"
-         class="{{ 'active' if ep in ('new_invoice', 'review_invoice', 'edit_invoice', 'issue_invoice') }}">
+         class="{{ 'active' if ep in ('new_invoice', 'review_invoice', 'show_review', 'issue_invoice') }}">
         <span class="icon">&#43;</span><span class="label">New invoice</span></a>
       <a href="{{ url_for('bir_page') }}" title="BIR" class="{{ 'active' if ep.startswith('bir') }}">
         <span class="icon">&#8645;</span><span class="label">BIR
@@ -83,6 +83,7 @@
 
   <div class="content">
   <div class="topline">
+  <button type="button" class="back-btn" id="back-btn" onclick="history.back()" title="Back to the previous page" hidden>&larr; Back</button>
   {% if cfg.is_prototype %}
   <div class="notice">
     <strong>Prototype mode.</strong> BIR has not issued
@@ -175,6 +176,12 @@
 </script>
 
 <script>
+  // The desktop window has no browser buttons: show our own Back when there
+  // is a page to go back to.
+  if (history.length > 1) document.getElementById("back-btn").hidden = false;
+</script>
+
+<script>
   // In the desktop app window (einvoice/desktop.py), links meant for a new tab,
   // like the invoice PDF, open in their own window instead of replacing this page.
   document.addEventListener("click", (e) => {
@@ -185,7 +192,7 @@
   });
 </script>
 
-{% if me and ep not in ('new_invoice', 'review_invoice', 'edit_invoice', 'issue_invoice') %}
+{% if me and ep not in ('new_invoice', 'review_invoice', 'show_review', 'issue_invoice') %}
 <a class="fab" href="{{ url_for('new_invoice') }}" title="New invoice">
   <span>+</span> New invoice
 </a>

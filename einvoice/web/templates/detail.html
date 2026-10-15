@@ -50,14 +50,19 @@
   {% endif %}
   {% if not email.is_configured %}
   <p class="muted">E-mail is not set up yet (SMTP settings in <code>.env</code>, see README "E-mail").</p>
-  {% elif cfg.is_prototype %}
-  <p class="muted">Prototype mode: e-mails go only to the test address {{ email.test_to or "(EMAIL_TEST_TO not set)" }}, never to the client.</p>
   {% endif %}
   <form method="post" action="{{ url_for('email_invoice_route', control_no=inv.control_no) }}"
         onsubmit="this.querySelector('button').disabled = true">
-    <button type="submit" class="button secondary"
-      {% if not email.is_configured or (not cfg.is_prototype and not inv.buyer_email) %}disabled{% endif %}>
-      {{ "Send again" if emails else "E-mail to client" }}{% if cfg.is_prototype %} (test){% endif %}</button>
+    <div class="row">
+      <label class="field"><span>To <em>*</em></span>
+        <input name="to" value="{{ inv.buyer_email }}" placeholder="client@example.com" required>
+        <small>The client's e-mail is filled in. Several addresses: separate them with commas.</small></label>
+      <label class="field"><span>Cc</span>
+        <input name="cc" value="" placeholder="optional">
+        {% if email.cc %}<small>Always copied: {{ email.cc | join(", ") }}</small>{% endif %}</label>
+    </div>
+    <button type="submit" class="button secondary" {% if not email.is_configured %}disabled{% endif %}>
+      {{ "Send again" if emails else "Send e-mail" }}</button>
   </form>
 </section>
 

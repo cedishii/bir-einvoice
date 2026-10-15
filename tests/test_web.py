@@ -26,7 +26,7 @@ def test_new_form_has_two_default_lines(client):
 
 
 def test_review_shows_php_and_does_not_use_a_number(client):
-    page = client.post("/invoices/review", data=form()).get_data(as_text=True)
+    page = client.post("/invoices/review", data=form(), follow_redirects=True).get_data(as_text=True)
     assert "4,560,000.00" in page and "Issue invoice No. 0001773" in page
     assert "No invoices yet" in client.get("/").get_data(as_text=True)
 
@@ -67,7 +67,7 @@ def test_unknown_invoice_404(client):
 
 
 def test_review_says_eis_check_passed(client):
-    page = client.post("/invoices/review", data=form()).get_data(as_text=True)
+    page = client.post("/invoices/review", data=form(), follow_redirects=True).get_data(as_text=True)
     assert "Passes the BIR e-invoice" in page
 
 

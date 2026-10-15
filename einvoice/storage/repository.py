@@ -60,8 +60,8 @@ class Repository:
             for no, line in enumerate(invoice.lines, start=1):
                 conn.execute(
                     """INSERT INTO invoice_lines VALUES (?,?,?,?,?,?,?,?,?,?)""",
-                    (invoice.id, no, line.item_name, line.description, str(line.qty),
-                     line.unit, str(line.unit_cost_jpy), str(line.amount_jpy),
+                    (invoice.id, no, line.item_name, line.description, _text(line.qty),
+                     line.unit, _text(line.unit_cost_jpy), str(line.amount_jpy),
                      str(line.unit_cost_php), str(line.sales_php)))
             invoice.issued_by = ledger.current_user()
             conn.execute("UPDATE invoices SET issued_by = ? WHERE id = ?",
@@ -132,12 +132,17 @@ class Repository:
         return [_invoice_from_rows(r, []) for r in rows]
 
 
+def _text(value: Decimal | None) -> str:
+    """Blank qty / unit price are stored as ''."""
+    return "" if value is None else str(value)
+
+
 def _invoice_from_rows(row: sqlite3.Row, line_rows: list[sqlite3.Row]) -> Invoice:
     lines = [
         InvoiceLine(
             item_name=l["item_name"], description=l["description"],
-            qty=Decimal(l["qty"]), unit=l["unit"],
-            unit_cost_jpy=Decimal(l["unit_cost_jpy"]),
+            qty=Decimal(l["qty"]) if l["qty"] else None, unit=l["unit"],
+            unit_cost_jpy=Decimal(l["unit_cost_jpy"]) if l["unit_cost_jpy"] else None,
             amount_jpy=Decimal(l["amount_jpy"]),
             unit_cost_php=Decimal(l["unit_cost_php"]),
             sales_php=Decimal(l["sales_php"]),

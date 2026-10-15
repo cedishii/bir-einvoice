@@ -23,7 +23,8 @@
 </label>
 {% endmacro %}
 
-<form method="post" action="{{ url_for('review_invoice') }}" class="card" novalidate>
+<form method="post" action="{{ url_for('review_invoice') }}" class="card" novalidate id="invoice-form">
+  <input type="hidden" name="draft" value="{{ draft_id }}">
   <fieldset>
     <legend>Invoice</legend>
     <div class="row">
@@ -68,7 +69,7 @@
       <thead>
         <tr>
           <th>Item name <em>*</em></th><th class="wide">Description <em>*</em></th>
-          <th>Qty</th><th>Unit</th><th>Unit price (JPY) <em>*</em></th><th></th>
+          <th>Qty</th><th>Unit</th><th>Unit price (JPY)</th><th></th>
         </tr>
       </thead>
       <tbody>
@@ -87,7 +88,9 @@
       </tbody>
     </table>
     <button type="button" class="link" id="add-line">+ Add line</button>
-    <small class="muted block">Blank lines are ignored.</small>
+    <small class="muted block">Qty, unit and unit price can be left blank. A blank qty counts as 1 and prints blank.
+      A line with no unit price is a note line: its description prints on the invoice, without an amount.
+      At least one line needs a unit price. Blank lines are ignored.</small>
   </fieldset>
 
   <fieldset>
@@ -107,6 +110,12 @@
 </form>
 
 <script>
+  // Going Back from the review page returns to this form with what was typed:
+  // the form's address becomes its draft, which the app keeps for a while.
+  document.getElementById("invoice-form").addEventListener("submit", () => {
+    try { history.replaceState(null, "", "{{ url_for('new_invoice', draft=draft_id) }}"); } catch (e) {}
+  });
+
   // Client TIN: keep only digits and add the dashes (123-456-789-00000).
   const tin = document.querySelector('[name="buyer_tin"]');
   tin.addEventListener("input", () => {

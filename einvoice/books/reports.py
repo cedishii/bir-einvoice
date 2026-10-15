@@ -403,3 +403,122 @@ def audit_log(conn: sqlite3.Connection, start: date, end: date, *, user: str | N
 
 def _blank(value) -> str:
     return "(blank)" if value in (None, "") else str(value)
+
+
+# --- Financial statements ----------------------------------------------------
+
+def _movements(conn, start: date | None, end: date) -> dict[str, Decimal]:
+    """Debits minus credits per account, from `start` (or the beginning) to `end`."""
+    sql = ("SELECT l.account_code, l.debit, l.credit FROM journal_lines l "
+           "JOIN journal_entries e ON e.id = l.entry_id WHERE e.entry_date <= ?")
+    args = [end.isoformat()]
+    if start:
+        sql += " AND e.entry_date >= ?"
+        args.append(start.isoformat())
+    out: dict[str, Decimal] = {}
+    for r in conn.execute(sql, args):
+        out[r[0]] = out.get(r[0], ZERO) + Decimal(r[1]) - Decimal(r[2])
+    return out
+
+
+def _section_lines(r: Report, accounts, moves, section: str, sign: int) -> Decimal:
+    """Add one statement section (accounts with a balance) and return its total.
+    sign 1 shows debit balances as positive (assets, expenses), -1 credits."""
+    rows = [(a, sign * moves.get(a["code"], ZERO)) for a in accounts if a["section"] == section]
+    rows = [(a, v) for a, v in rows if v]
+    total = sum((v for _, v in rows), ZERO)
+    if rows:
+        r.rows.append(Row([section], "group"))
+        for a, v in rows:
+            r.rows.append(Row([f"{a['code']} {a['name']}", v]))
+        r.rows.append(Row([f"Total {section.lower()}", total], "sub"))
+    return total
+
+
+def income_statement(conn: sqlite3.Connection, start: date, end: date) -> Report:
+    """Income against expenses for a period, and the profit (or loss) left."""
+    r = Report("is", "Income Statement", start, end,
+               [Column("Account", width=4.0), Column("Amount (PHP)", "num", 1.4)])
+    accounts = ledger.accounts(conn)
+    m = _movements(conn, start, end)
+    revenue = _section_lines(r, accounts, m, "Revenue", -1)
+    cost = _section_lines(r, accounts, m, "Cost of services", 1)
+    r.rows.append(Row(["Gross profit", revenue - cost], "total"))
+    opex = _section_lines(r, accounts, m, "Operating expenses", 1)
+    r.rows.append(Row(["Income from operations", revenue - cost - opex], "total"))
+    other_in = _section_lines(r, accounts, m, "Other income", -1)
+    other_ex = _section_lines(r, accounts, m, "Other expenses", 1)
+    before_tax = revenue - cost - opex + other_in - other_ex
+    r.rows.append(Row(["Net income (loss) before income tax", before_tax], "total"))
+    tax = _section_lines(r, accounts, m, "Income tax", 1)
+    r.rows.append(Row(["NET INCOME (LOSS)", before_tax - tax], "total"))
+    r.notes.append("Income minus expenses for the period, from the posted journal entries. "
+                   "A negative amount is a loss.")
+    return r
+
+
+def net_income(conn, start: date | None, end: date) -> Decimal:
+    """Income minus expenses (all income and expense accounts)."""
+    types = {a["code"]: a["type"] for a in ledger.accounts(conn)}
+    return -sum((v for code, v in _movements(conn, start, end).items()
+                 if types.get(code) in ("income", "expense")), ZERO)
+
+
+def balance_sheet(conn: sqlite3.Connection, as_of: date) -> Report:
+    """What the company owns (assets) against what it owes (liabilities) and
+    the owners' share (equity): assets = liabilities + equity."""
+    r = Report("bs", "Balance Sheet", None, as_of,
+               [Column("Account", width=4.0), Column("Amount (PHP)", "num", 1.4)])
+    accounts = ledger.accounts(conn)
+    m = _movements(conn, None, as_of)
+    assets = sum((_section_lines(r, accounts, m, s, 1) for s in ("Current assets",
+                                                                 "Non-current assets")), ZERO)
+    r.rows.append(Row(["TOTAL ASSETS", assets], "total"))
+    liabilities = sum((_section_lines(r, accounts, m, s, -1)
+                       for s in ("Current liabilities", "Non-current liabilities")), ZERO)
+    r.rows.append(Row(["Total liabilities", liabilities], "total"))
+    equity = _section_lines(r, accounts, m, "Equity", -1)
+    earnings = net_income(conn, None, as_of)
+    r.rows.append(Row(["Net income (loss) not yet closed to retained earnings", earnings]))
+    r.rows.append(Row(["Total equity", equity + earnings], "total"))
+    r.rows.append(Row(["TOTAL LIABILITIES AND EQUITY", liabilities + equity + earnings], "total"))
+    if assets != liabilities + equity + earnings:
+        r.notes.append("Assets do not equal liabilities and equity. Run the integrity check.")
+    r.notes.append("Every entry is posted twice (a debit and a credit), so the two sides "
+                   "always balance. Income and expenses not yet closed into retained earnings "
+                   "are shown as the current earnings line.")
+    return r
+
+
+def monthly_summary(conn: sqlite3.Connection, start: date, end: date) -> Report:
+    """Income, expenses and net income for each month of the period."""
+    r = Report("monthly", "Income vs Expenses by Month", start, end, [
+        Column("Month", width=1.6), Column("Income (PHP)", "num", 1.4),
+        Column("Expenses (PHP)", "num", 1.4), Column("Net income (PHP)", "num", 1.4)])
+    types = {a["code"]: a["type"] for a in ledger.accounts(conn)}
+    tot_i = tot_e = ZERO
+    month = date(start.year, start.month, 1)
+    while month <= end:
+        m_end = min(_month_end(month, 0), end)
+        moves = _movements(conn, max(month, start), m_end)
+        income = -sum((v for c, v in moves.items() if types.get(c) == "income"), ZERO)
+        expense = sum((v for c, v in moves.items() if types.get(c) == "expense"), ZERO)
+        tot_i, tot_e = tot_i + income, tot_e + expense
+        r.rows.append(Row([f"{month:%B %Y}", income, expense, income - expense]))
+        month = m_end + timedelta(days=1)
+    r.rows.append(Row(["Total", tot_i, tot_e, tot_i - tot_e], "total"))
+    return r
+
+
+def _type_total(conn, start: date, end: date, account_type: str, sign: int) -> Decimal:
+    types = {a["code"]: a["type"] for a in ledger.accounts(conn)}
+    return sign * sum((v for c, v in _movements(conn, start, end).items()
+                       if types.get(c) == account_type), ZERO)
+
+
+def income_total(conn, start: date, end: date) -> Decimal:
+    return _type_total(conn, start, end, "income", -1)
+
+
+def expense_total(conn, start: date, end: date) -> Decimal:
+    return _type_total(conn, start, end, "expense", 1)

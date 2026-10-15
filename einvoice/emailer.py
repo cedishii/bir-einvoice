@@ -3,10 +3,9 @@
 Works with any mail provider that allows SMTP (Microsoft 365 / Outlook,
 Gmail / Google Workspace, the company's own server). Settings are in .env.
 
-Safety: while the app is in prototype mode (BIR values still placeholders)
-the PDF carries a "PROTOTYPE - NOT A VALID INVOICE" watermark, so e-mails
-never go to the client. They go to EMAIL_TEST_TO instead, marked [TEST],
-or are not sent at all if EMAIL_TEST_TO is empty.
+The user types the recipients on the invoice page (the client's e-mail is
+filled in); automatic e-mails on issue go to the client's e-mail. Every
+e-mail says it was sent automatically and needs no reply.
 """
 from __future__ import annotations
 
@@ -40,7 +39,6 @@ class EmailSettings:
     cc: tuple[str, ...] = ()
     bcc: tuple[str, ...] = ()
     auto_send: bool = False
-    test_to: str = ""
     timeout_seconds: int = 30
 
     @property
@@ -57,8 +55,22 @@ class EmailSettings:
         return not self.missing
 
 
+MAX_RECIPIENTS = 10
+
+
 def _addresses(text: str) -> tuple[str, ...]:
     return tuple(a.strip() for a in (text or "").replace(";", ",").split(",") if a.strip())
+
+
+def parse_recipients(text: str, label: str) -> tuple[str, ...]:
+    """'a@x.com; b@y.com' -> ('a@x.com', 'b@y.com'), checking each address."""
+    found = _addresses(text)
+    bad = [a for a in found if not is_email(a)]
+    if bad:
+        raise EmailError(f"{label}: not a valid e-mail address: {', '.join(bad)}")
+    if len(found) > MAX_RECIPIENTS:
+        raise EmailError(f"{label}: at most {MAX_RECIPIENTS} addresses.")
+    return found
 
 
 def load_email_settings() -> EmailSettings:
@@ -77,7 +89,6 @@ def load_email_settings() -> EmailSettings:
         cc=_addresses(env("EMAIL_CC", "")),
         bcc=_addresses(env("EMAIL_BCC", "")),
         auto_send=env("EMAIL_AUTO_SEND", "false").strip().lower() in ("1", "true", "yes", "on"),
-        test_to=env("EMAIL_TEST_TO", "").strip(),
         timeout_seconds=int(env("SMTP_TIMEOUT_SECONDS", "30")),
     )
 
@@ -104,20 +115,22 @@ def smtp_send(settings: EmailSettings, msg: EmailMessage) -> None:
         server.send_message(msg)
 
 
+AUTO_NOTE = ("This is an automatically generated e-mail. Please do not reply to this "
+             "message; replies to this address are not monitored.")
+
+
 def build_message(inv: Invoice, cfg: Config, settings: EmailSettings, pdf: bytes,
-                  to: str, test: bool) -> EmailMessage:
+                  to: tuple[str, ...], cc: tuple[str, ...]) -> EmailMessage:
     seller = cfg.seller
-    subject = f"Service Invoice No. {inv.control_no} - {seller.reg_nm}"
-    if test:
-        subject = "[TEST] " + subject
     msg = EmailMessage()
-    msg["Subject"] = subject
+    msg["Subject"] = f"Service Invoice No. {inv.control_no} - {seller.reg_nm}"
     msg["From"] = formataddr((settings.from_name or seller.reg_nm, settings.from_addr))
-    msg["To"] = to
-    if settings.cc and not test:
-        msg["Cc"] = ", ".join(settings.cc)
-    if settings.bcc and not test:
+    msg["To"] = ", ".join(to)
+    if cc:
+        msg["Cc"] = ", ".join(cc)
+    if settings.bcc:
         msg["Bcc"] = ", ".join(settings.bcc)
+    msg["Auto-Submitted"] = "auto-generated"  # tells mail programs not to auto-reply
     msg["Message-ID"] = make_msgid(domain=settings.from_addr.split("@")[-1])
 
     lines = [
@@ -139,65 +152,60 @@ def build_message(inv: Invoice, cfg: Config, settings: EmailSettings, pdf: bytes
         seller.reg_nm,
         seller.reg_addr,
         f"Tel. {seller.tel}",
+        "",
+        "-" * 60,
+        AUTO_NOTE,
+        "For questions about this invoice, please contact us at "
+        + (f"{seller.email} or " if seller.email else "") + f"tel. {seller.tel}.",
     ]
-    if test:
-        lines = [f"*** TEST e-mail. In real use this would go to {to_original(inv)}. ***",
-                 "*** The attached invoice is a PROTOTYPE and not valid. ***", ""] + lines
     msg.set_content("\n".join(lines))
     msg.add_attachment(pdf, maintype="application", subtype="pdf",
                        filename=f"Service-Invoice-{inv.control_no}.pdf")
     return msg
 
 
-def to_original(inv: Invoice) -> str:
-    return inv.buyer_email or "(no client e-mail on file)"
-
-
 @dataclass
 class EmailResult:
     sent: bool
     to: str
-    test: bool
     message: str
 
 
 def send_invoice(conn: sqlite3.Connection, inv: Invoice, cfg: Config, settings: EmailSettings,
-                 *, automatic: bool = False, sender: Sender = smtp_send) -> EmailResult:
-    """Send (and log) the invoice e-mail. Raises EmailError before sending if
-    it can't be sent; a failed SMTP attempt is logged and re-raised."""
+                 *, to: str | None = None, cc: str = "", automatic: bool = False,
+                 sender: Sender = smtp_send) -> EmailResult:
+    """Send (and log) the invoice e-mail to `to` (one or more addresses,
+    separated by commas or semicolons; default: the client's e-mail), with
+    `cc` plus EMAIL_CC. Raises EmailError before sending if it can't be sent;
+    a failed SMTP attempt is logged and re-raised."""
     if inv.status != "issued":
         raise EmailError("Only issued invoices can be e-mailed.")
     if not settings.is_configured:
         raise EmailError("E-mail is not set up. Missing in .env: " + ", ".join(settings.missing))
-    test = cfg.is_prototype
-    if test:
-        if not is_email(settings.test_to):
-            raise EmailError("Prototype mode: invoices are only e-mailed to EMAIL_TEST_TO, "
-                             "which is not set in .env.")
-        to = settings.test_to
-    else:
-        if not inv.buyer_email:
-            raise EmailError("This invoice has no client e-mail.")
-        to = inv.buyer_email
+    recipients = parse_recipients(inv.buyer_email if to is None else to, "To")
+    if not recipients:
+        raise EmailError("Enter at least one e-mail address to send to." if to is not None
+                         else "This invoice has no client e-mail.")
+    copies = tuple(dict.fromkeys(parse_recipients(cc, "Cc") + settings.cc))
 
-    msg = build_message(inv, cfg, settings, render_pdf(inv, cfg), to, test)
+    msg = build_message(inv, cfg, settings, render_pdf(inv, cfg), recipients, copies)
     now = datetime.now(PH_TZ).isoformat(timespec="seconds")
-    cc = "" if test else ", ".join(settings.cc)
+    to_text, cc_text = ", ".join(recipients), ", ".join(copies)
     try:
         sender(settings, msg)
     except (smtplib.SMTPException, OSError) as e:
-        _log(conn, inv, now, to, cc, msg["Subject"], "failed", str(e), test, automatic)
+        _log(conn, inv, now, to_text, cc_text, msg["Subject"], "failed", str(e), automatic)
         raise EmailError(f"Sending failed: {e}") from None
-    _log(conn, inv, now, to, cc, msg["Subject"], "sent", "", test, automatic)
-    label = f"TEST e-mail sent to {to}" if test else f"E-mailed to {to}"
-    return EmailResult(True, to, test, label + (f" (cc {cc})" if cc else "") + ".")
+    _log(conn, inv, now, to_text, cc_text, msg["Subject"], "sent", "", automatic)
+    return EmailResult(True, to_text, f"E-mailed to {to_text}"
+                       + (f" (cc {cc_text})" if cc_text else "") + ".")
 
 
-def _log(conn, inv, when, to, cc, subject, status, error, test, automatic):
+def _log(conn, inv, when, to, cc, subject, status, error, automatic):
     conn.execute(
         """INSERT INTO invoice_emails (invoice_id, sent_at, to_addr, cc, subject, status,
-               error, test, automatic) VALUES (?,?,?,?,?,?,?,?,?)""",
-        (inv.id, when, to, cc, subject, status, error, int(test), int(automatic)))
+               error, automatic) VALUES (?,?,?,?,?,?,?,?)""",
+        (inv.id, when, to, cc, subject, status, error, int(automatic)))
 
 
 def history(conn: sqlite3.Connection, inv: Invoice) -> list[sqlite3.Row]:

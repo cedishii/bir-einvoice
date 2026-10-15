@@ -132,6 +132,6 @@ def test_exempt_pdf(repo, config):
 
 
 def test_review_page_carries_sale_type_to_issue(client):
-    page = client.post("/invoices/review", data=form(trans_class="01")).get_data(as_text=True)
+    page = client.post("/invoices/review", data=form(trans_class="01"), follow_redirects=True).get_data(as_text=True)
     assert '<input type="hidden" name="trans_class" value="01">' in page
     assert "VATable (12%)" in page and "5,107,200.00" in page

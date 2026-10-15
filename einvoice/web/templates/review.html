@@ -16,22 +16,26 @@
 {% endif %}
 
 {% if email.auto_send and inv.buyer_email %}
-<p class="muted">After issuing, the PDF is e-mailed {% if cfg.is_prototype %}as a TEST to {{ email.test_to or "(EMAIL_TEST_TO not set)" }}{% else %}to <strong>{{ inv.buyer_email }}</strong>{% endif %}.</p>
+<p class="muted">After issuing, the PDF is e-mailed to <strong>{{ inv.buyer_email }}</strong>.</p>
 {% endif %}
 <div class="card">
   {% include "_summary.html" %}
 </div>
 
+{% if issued_as %}
+<div class="flash">This invoice was issued as
+  <a href="{{ url_for('show_invoice', control_no=issued_as) }}">No. {{ issued_as }}</a>.</div>
+{% endif %}
+
 <div class="actions">
-  <form method="post" action="{{ url_for('edit_invoice') }}">
-    {% include "_hidden.html" %}
-    <button type="submit" class="button secondary">&larr; Back to edit</button>
-  </form>
+  <a class="button secondary" href="{{ url_for('new_invoice', draft=token) }}">&larr; Back to edit</a>
+  {% if not issued_as %}
   <form method="post" action="{{ url_for('issue_invoice') }}"
         onsubmit="this.querySelector('button').disabled = true">
     {% include "_hidden.html" %}
     <input type="hidden" name="token" value="{{ token }}">
     <button type="submit" class="button" {% if problems %}disabled{% endif %}>Issue invoice No. {{ next_no }}</button>
   </form>
+  {% endif %}
 </div>
 {% endblock %}

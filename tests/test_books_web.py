@@ -44,16 +44,16 @@ def test_invoice_shows_its_books_entry_and_collection(client):
     detail = page(client, f"/invoices/{no}")
     assert "SJ-1" in detail and "4,560,000.00" in detail
     sj = page(client, "/books/report/SJ?from=2024-11-01&to=2024-11-30")
-    assert "SI 0001773" in sj and "1100 Accounts Receivable" in sj
+    assert "SI 0001773" in sj and "11110 Accounts receivable - trade" in sj
 
     new = page(client, "/collections/new?invoice=1")
     assert 'data-balance="4560000.00"' in new
     r = client.post("/collections/new", data={
         "invoice_id": "1", "coll_date": "2024-12-05", "reference": "OR 77",
-        "applied": "4,560,000.00", "cash": "4,550,000.00", "cash_account": "1020"})
+        "applied": "4,560,000.00", "cash": "4,550,000.00", "cash_account": "11040"})
     assert r.status_code == 302 and "/books/entries/" in r.location
     entry = page(client, r.location)
-    assert "CRJ-1" in entry and "5900 Foreign Exchange Loss" in entry and "10,000.00" in entry
+    assert "CRJ-1" in entry and "62030 Realized forex loss" in entry and "10,000.00" in entry
     assert "to collect: <strong>PHP 0.00" in page(client, f"/invoices/{no}")
 
 
@@ -61,7 +61,7 @@ def test_collection_errors_are_shown(client):
     issue(client)
     r = client.post("/collections/new", data={
         "invoice_id": "1", "coll_date": "2024-12-05", "reference": "",
-        "applied": "100", "cash": "100", "cash_account": "1020"})
+        "applied": "100", "cash": "100", "cash_account": "11040"})
     assert r.status_code == 422 and "Reference" in r.get_data(as_text=True)
 
 
@@ -72,13 +72,13 @@ def test_supplier_bill_payment_and_reports(client):
     assert "123-456-789-00000" in page(client, "/suppliers")
     r = client.post("/bills/new", data={
         "supplier_id": "1", "bill_date": "2024-11-03", "supplier_ref": "SI 88",
-        "description": "Office rent", "account_code": "5100", "category": "services",
+        "description": "Office rent", "account_code": "61270", "category": "services",
         "net": "50,000", "vat": "6,000"})
     assert r.status_code == 302
     assert "56,000.00" in page(client, "/bills")
     r = client.post("/payments/new", data={
         "bill_id": "1", "pay_date": "2024-11-05", "reference": "CHK 1", "amount": "56000",
-        "cash_account": "1020", "atc": "WI100", "ewt_base": "50000", "ewt_rate": "5",
+        "cash_account": "11040", "atc": "WI100", "ewt_base": "50000", "ewt_rate": "5",
         "ewt": "2500"})
     assert r.status_code == 302
     assert "53,500.00" in page(client, "/payments")
@@ -96,7 +96,7 @@ def test_supplier_bill_payment_and_reports(client):
 
 def test_manual_entry_and_reversal(client):
     data = {"entry_date": "2024-11-30", "reference": "JV-1", "particulars": "Opening capital",
-            "party": "", "account[]": ["1020", "3000"], "debit[]": ["100,000", ""],
+            "party": "", "account[]": ["11040", "31010"], "debit[]": ["100,000", ""],
             "credit[]": ["", "100000"], "memo[]": ["", ""]}
     r = client.post("/books/entries/new", data=data)
     assert r.status_code == 302
@@ -115,7 +115,7 @@ def test_accounts_close_and_archive(client):
                                    "type": "asset", "is_cash": "1"})
     assert "Cash in Bank - USD" in page(client, "/accounts")
     assert "1030 Cash in Bank - USD" in page(client, "/collections/new")
-    r = client.post("/accounts/1100", data={"name": "Trade Receivables"})  # auto: stays active
+    r = client.post("/accounts/11110", data={"name": "Trade Receivables"})  # auto: stays active
     assert "stays active" in page(client, "/accounts")
 
     issue(client)

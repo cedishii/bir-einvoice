@@ -8,6 +8,20 @@
 </div>
 
 <section class="card">
+  <h2>Income vs expenses, {{ today.year }} so far</h2>
+  <div class="kpis">
+    <div><small>Income</small><strong>{{ fmt(totals.income) }}</strong></div>
+    <div><small>Expenses</small><strong>{{ fmt(totals.expenses) }}</strong></div>
+    <div><small>{{ "Net income" if totals.net >= 0 else "Net loss" }}</small>
+      <strong class="{{ 'ok' if totals.net >= 0 else 'bad' }}">{{ fmt(totals.net) }}</strong></div>
+  </div>
+  <p class="muted">PHP, from January 1 to today.
+    <a href="{{ url_for('books.report', key='is', **{'from': today.replace(month=1, day=1), 'to': today}) }}">Income Statement</a> ·
+    <a href="{{ url_for('books.report', key='monthly', **{'from': today.replace(month=1, day=1), 'to': today}) }}">By month</a> ·
+    <a href="{{ url_for('books.report', key='bs', to=today) }}">Balance Sheet</a></p>
+</section>
+
+<section class="card">
   <h2>Integrity</h2>
   {% if problems %}
     <p class="bad">The journal check FAILED. The database was changed outside the app:</p>
@@ -17,11 +31,11 @@
       <span class="muted">Every entry balances and none was changed, removed or inserted after posting.</span></p>
   {% endif %}
   {% if audit_problems %}
-    <p class="bad">The audit trail check FAILED. Rows were changed or removed outside the app:</p>
+    <p class="bad">The history check FAILED. Rows were changed or removed outside the app:</p>
     <ul>{% for p in audit_problems %}<li>{{ p }}</li>{% endfor %}</ul>
   {% else %}
-    <p><span class="ok">Audit trail check OK.</span>
-      <span class="muted">All {{ audit_rows }} rows are intact. <a href="{{ url_for('books.report', key='audit') }}">Open the audit trail</a>.</span></p>
+    <p><span class="ok">History check OK.</span>
+      <span class="muted">All {{ audit_rows }} rows are intact. <a href="{{ url_for('books.report', key='audit') }}">Open the history</a>.</span></p>
   {% endif %}
   <p class="muted">Entries per book:
     {% for k, n in counts.items() %}{{ k }} {{ n }}{{ ", " if not loop.last }}{% endfor %}.
@@ -37,10 +51,10 @@
   </form>
   <p class="muted">{{ start.strftime("%B %d, %Y") }} to {{ end.strftime("%B %d, %Y") }}. Each book opens on screen, with PDF (to print) and CSV (for Excel).</p>
   <ul class="report-list">
-    {% for key in ["SJ", "PJ", "CRJ", "CDJ", "GJ", "gl", "ar", "ap", "tb", "audit"] %}
+    {% for key in ["is", "bs", "monthly", "SJ", "PJ", "CRJ", "CDJ", "GJ", "gl", "ar", "ap", "tb", "audit"] %}
     <li><a href="{{ url_for('books.report', key=key, **{'from': start, 'to': end}) }}">
       <span>{{ reports[key] }}</span>
-      <small>{% if key == "tb" %}As of {{ end }}{% elif key in counts %}{{ counts[key] }} entries in total{% else %}{{ {"gl": "Every account, with running balances", "ar": "Receivables per client", "ap": "Payables per supplier", "audit": "Every posting, change and printout"}[key] }}{% endif %}</small></a></li>
+      <small>{% if key == "tb" %}As of {{ end }}{% elif key == "bs" %}Assets = liabilities + equity, as of {{ end }}{% elif key in counts %}{{ counts[key] }} entries in total{% else %}{{ {"is": "Income minus expenses = profit", "monthly": "Income, expenses and net per month", "gl": "Every account, with running balances", "ar": "Receivables per client", "ap": "Payables per supplier", "audit": "Every posting, change and printout"}[key] }}{% endif %}</small></a></li>
     {% endfor %}
   </ul>
 </section>

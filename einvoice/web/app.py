@@ -1,6 +1,7 @@
 """Local web UI: invoice list, entry form, review, detail, PDF, void."""
 from __future__ import annotations
 
+import re
 import secrets
 from datetime import date
 
@@ -43,9 +44,13 @@ def create_app(config: Config | None = None, transport: TransportSettings | None
     send_mail = email_sender if email_sender is not None else emailer.smtp_send
     eis_clients: list[EisClient] = []  # one client, so the login session is reused
     app.secret_key = secrets.token_hex(16)
-    # Review-page tokens already used to issue an invoice -> control number,
-    # so a double click or a browser "resubmit" never issues twice.
+    # Draft id already used to issue an invoice -> control number, so a double
+    # click or a browser "resubmit" never issues twice.
     issued_tokens: dict[str, str] = {}
+    # Invoices being filled in, by draft id. The review page has its own
+    # address (/invoices/review/<draft>) and the form can be reopened from a
+    # draft, so Back always works and never asks to resubmit a form.
+    drafts: dict[str, dict] = {}
 
     def cfg() -> Config:
         return app.config["EINVOICE"]
@@ -81,9 +86,9 @@ def create_app(config: Config | None = None, transport: TransportSettings | None
     def email_settings() -> emailer.EmailSettings:
         return app.config["EMAIL"]
 
-    def email_invoice(inv, automatic=False):
+    def email_invoice(inv, automatic=False, to=None, cc=""):
         try:
-            result = emailer.send_invoice(repo().conn, inv, cfg(), email_settings(),
+            result = emailer.send_invoice(repo().conn, inv, cfg(), email_settings(), to=to, cc=cc,
                                           automatic=automatic, sender=send_mail)
             ledger.audit(repo().conn, "e-mail invoice", result.message, entity="invoice",
                          entity_id=inv.control_no)
@@ -110,10 +115,20 @@ def create_app(config: Config | None = None, transport: TransportSettings | None
             data[k + "[]"] = request.form.getlist(k + "[]")
         return data
 
-    def render_form(data: dict, errors: dict | None = None, status=200):
+    def render_form(data: dict, errors: dict | None = None, status=200, draft_id: str = ""):
         rows = list(zip(*(data[k + "[]"] for k in LINE_FIELDS)))
         return render_template("form.html", data=data, rows=rows, errors=errors or {},
-                               next_no=repo().next_control_no()), status
+                               next_no=repo().next_control_no(),
+                               draft_id=draft_id or secrets.token_hex(16)), status
+
+    def keep_draft(data: dict) -> str:
+        draft_id = request.form.get("draft", "")
+        if not re.fullmatch(r"[0-9a-f]{32}", draft_id):
+            draft_id = secrets.token_hex(16)
+        drafts[draft_id] = data
+        while len(drafts) > 200:  # only recent drafts are kept
+            drafts.pop(next(iter(drafts)))
+        return draft_id
 
     def eis_states() -> dict[int, str]:
         rows = repo().conn.execute("SELECT invoice_id, eis_unique_id FROM eis_exports").fetchall()
@@ -127,6 +142,13 @@ def create_app(config: Config | None = None, transport: TransportSettings | None
 
     @app.get("/invoices/new")
     def new_invoice():
+        draft_id = request.args.get("draft", "")
+        if draft_id in drafts:
+            if draft_id in issued_tokens:
+                flash(f"That invoice was already issued as No. {issued_tokens[draft_id]}. "
+                      "This is a new one.")
+            else:
+                return render_form(drafts[draft_id], draft_id=draft_id)
         today = today_ph().isoformat()
         data = {k: "" for k in FORM_FIELDS} | {"issue_date": today, "rate_date": today}
         last = repo().list()
@@ -148,19 +170,28 @@ def create_app(config: Config | None = None, transport: TransportSettings | None
     @app.post("/invoices/review")
     def review_invoice():
         data = form_data()
+        draft_id = keep_draft(data)
+        try:
+            invoice_from_form(data)
+        except FormErrors as e:
+            return render_form(data, e.errors, status=422, draft_id=draft_id)
+        return redirect(url_for("show_review", draft=draft_id))
+
+    @app.get("/invoices/review/<draft>")
+    def show_review(draft):
+        data = drafts.get(draft)
+        if data is None:
+            flash("That draft is no longer open. Please fill in the invoice again.", "error")
+            return redirect(url_for("new_invoice"))
         try:
             inv = invoice_from_form(data)
-        except FormErrors as e:
-            return render_form(data, e.errors, status=422)
+        except FormErrors:
+            return redirect(url_for("new_invoice", draft=draft))
         next_no = repo().next_control_no()
         problems = eis_export.precheck(inv, cfg(), next_no)
         return render_template("review.html", inv=inv, data=data, rows=list(
-            zip(*(data[k + "[]"] for k in LINE_FIELDS))), token=secrets.token_hex(16),
-            next_no=next_no, problems=problems)
-
-    @app.post("/invoices/edit")
-    def edit_invoice():
-        return render_form(form_data())
+            zip(*(data[k + "[]"] for k in LINE_FIELDS))), token=draft,
+            next_no=next_no, problems=problems, issued_as=issued_tokens.get(draft))
 
     @app.post("/invoices/issue")
     def issue_invoice():
@@ -171,16 +202,17 @@ def create_app(config: Config | None = None, transport: TransportSettings | None
         try:
             inv = invoice_from_form(data)
         except FormErrors as e:
-            return render_form(data, e.errors, status=422)
+            return render_form(data, e.errors, status=422, draft_id=token)
         # Never issue an invoice that couldn't later be exported to EIS.
         problems = eis_export.precheck(inv, cfg(), repo().next_control_no())
         if problems:
             return render_form(data, {f"eis{i}": f"BIR e-invoice check: {p}"
-                                      for i, p in enumerate(problems)}, status=422)
+                                      for i, p in enumerate(problems)}, status=422,
+                               draft_id=token)
         try:
             inv = repo().issue(inv)
         except BooksError as e:  # e.g. the invoice date is in a closed period
-            return render_form(data, {"books": str(e)}, status=422)
+            return render_form(data, {"books": str(e)}, status=422, draft_id=token)
         issued_tokens[token] = inv.control_no
         flash(f"Service Invoice No. {inv.control_no} issued.")
         if email_settings().auto_send:
@@ -275,7 +307,8 @@ def create_app(config: Config | None = None, transport: TransportSettings | None
 
     @app.post("/invoices/<control_no>/email")
     def email_invoice_route(control_no):
-        email_invoice(get_or_404(control_no))
+        email_invoice(get_or_404(control_no), to=request.form.get("to", ""),
+                      cc=request.form.get("cc", ""))
         return redirect(url_for("show_invoice", control_no=control_no))
 
     # --- Phase 3: sending to BIR -------------------------------------------

@@ -51,15 +51,27 @@ def today_ph() -> date:
 
 @dataclass
 class InvoiceLine:
+    """One line of the invoice. Qty, unit and unit price may be left blank:
+    a blank qty counts as 1 (printed blank), and a line without a unit price
+    is a text-only line (printed, no amount, not sent to BIR as an item)."""
     item_name: str
     description: str
-    qty: Decimal
+    qty: Decimal | None
     unit: str
-    unit_cost_jpy: Decimal
+    unit_cost_jpy: Decimal | None
     # Derived (filled by Invoice.compute)
     amount_jpy: Decimal = money.ZERO
     unit_cost_php: Decimal = money.ZERO
     sales_php: Decimal = money.ZERO
+
+    @property
+    def is_text(self) -> bool:
+        return self.unit_cost_jpy is None
+
+    @property
+    def billed_qty(self) -> Decimal:
+        """The quantity the amount is computed with (and sent to BIR)."""
+        return self.qty if self.qty is not None else Decimal(1)
 
 
 @dataclass
@@ -92,13 +104,21 @@ class Invoice:
 
     def compute(self) -> "Invoice":
         for line in self.lines:
-            amounts = money.line_amounts(line.qty, line.unit_cost_jpy, self.rate)
+            if line.is_text:
+                line.amount_jpy = line.unit_cost_php = line.sales_php = money.ZERO
+                continue
+            amounts = money.line_amounts(line.billed_qty, line.unit_cost_jpy, self.rate)
             line.amount_jpy = amounts["amount_jpy"]
             line.unit_cost_php = amounts["unit_cost_php"]
             line.sales_php = amounts["sales_php"]
         self.total_jpy = sum((l.amount_jpy for l in self.lines), money.ZERO)
         self.total_php = sum((l.sales_php for l in self.lines), money.ZERO)
         return self
+
+    @property
+    def items(self) -> list[InvoiceLine]:
+        """Lines with an amount (the items sold); text-only lines left out."""
+        return [l for l in self.lines if not l.is_text]
 
     @property
     def is_vatable(self) -> bool:
@@ -231,7 +251,8 @@ def invoice_from_form(form: dict) -> Invoice:
             continue  # blank row (item name/qty/unit have defaults)
         key = f"line{i}"
         problems = []
-        if not name:
+        priced = bool(str(cost).strip())
+        if priced and not name:
             problems.append("item name is required")
         elif len(name) > MAX_LEN["item_name"]:
             problems.append(f"item name is limited to {MAX_LEN['item_name']} characters")
@@ -241,23 +262,24 @@ def invoice_from_form(form: dict) -> Invoice:
             problems.append(f"description is limited to {MAX_LEN['description']} characters")
         if len(unit) > MAX_LEN["unit"]:
             problems.append(f"unit is limited to {MAX_LEN['unit']} characters")
-        try:
-            q = money.parse_qty(qty or "1")
-        except money.MoneyError as e:
-            problems.append(str(e).lower())
-            q = None
-        try:
-            c = money.parse_jpy(cost, field="Unit price (JPY)")
-        except money.MoneyError as e:
-            problems.append(str(e).lower())
-            c = None
+        q = c = None
+        if str(qty).strip():
+            try:
+                q = money.parse_qty(qty)
+            except money.MoneyError as e:
+                problems.append(str(e).lower())
+        if priced:
+            try:
+                c = money.parse_jpy(cost, field="Unit price (JPY)")
+            except money.MoneyError as e:
+                problems.append(str(e).lower())
         if problems:
             errors[key] = f"Line {i}: " + "; ".join(problems) + "."
         else:
             lines.append(InvoiceLine(name, desc, q, unit, c))
 
-    if not lines and not any(k.startswith("line") for k in errors):
-        errors["lines"] = "Add at least one line with a description and a JPY amount."
+    if not any(not l.is_text for l in lines) and not any(k.startswith("line") for k in errors):
+        errors["lines"] = "Add at least one line with a description and a unit price (JPY)."
     if len(lines) > MAX_LINES:
         errors["lines"] = f"At most {MAX_LINES} lines per invoice."
     if errors:

@@ -142,11 +142,17 @@ def _lines(inv: Invoice):
             _p("UNIT", S_HEAD), _p("UNIT PRICE (JPY)", S_HEAD_R),
             _p("AMOUNT (JPY)", S_HEAD_R), _p("AMOUNT (PHP)", S_HEAD_R)]
     rows = [head]
-    for i, line in enumerate(inv.lines, start=1):
+    n = 0
+    for line in inv.lines:
+        if line.is_text:  # a note line: description only, no number or amounts
+            rows.append(["", Paragraph(_esc(line.description), S_CELL)] + [""] * 5)
+            continue
+        n += 1
         particulars = Paragraph(
             f"<b>{_esc(line.item_name)}</b><br/>{_esc(line.description)}", S_CELL)
+        qty = fmt_qty(line.qty) if line.qty is not None else ""
         rows.append([
-            _p(i, S_CELL), particulars, _p(fmt_qty(line.qty), _style("q", 8.5, align=TA_RIGHT)),
+            _p(n, S_CELL), particulars, _p(qty, _style("q", 8.5, align=TA_RIGHT)),
             _p(line.unit or "", S_CELL),
             _p(_money(line.unit_cost_jpy), _style("u", 8.5, align=TA_RIGHT)),
             _p(_money(line.amount_jpy), _style("a", 8.5, align=TA_RIGHT)),

@@ -21,7 +21,7 @@ def supplier(conn):
                                     address="Makati")
 
 
-def bill(conn, sid, d, net, vat, account="5100", category="services"):
+def bill(conn, sid, d, net, vat, account="61270", category="services"):
     return postings.create_bill(conn, supplier_id=sid, bill_date=d, supplier_ref=str(d),
                                 description="x", account_code=account, category=category,
                                 net=D(net), vat=D(vat))
@@ -29,7 +29,7 @@ def bill(conn, sid, d, net, vat, account="5100", category="services"):
 
 def pay(conn, sid, d, ewt, base):
     return postings.create_payment(conn, supplier_id=sid, pay_date=d, reference=str(d),
-                                   amount=D(base) + D("1000"), cash_account="1020",
+                                   amount=D(base) + D("1000"), cash_account="11040",
                                    ewt=D(ewt), atc="WI100", ewt_base=D(base), ewt_rate=D("5"))
 
 
@@ -107,7 +107,7 @@ def test_mcit_and_cost_of_sales(repo):
     a = amounts(sheet(conn, "1702Q", 2024, 1))
     assert a["Regular income tax (25% of taxable income)"] == D("15000.00")
     assert a["Income tax due (the higher of the two)"] == D("91200.00")  # MCIT
-    conn.execute("UPDATE accounts SET is_cost = 1 WHERE code = '5100'")  # rent as cost of services
+    conn.execute("UPDATE accounts SET is_cost = 1 WHERE code = '61270'")  # rent as cost of services
     a = amounts(sheet(conn, "1702Q", 2024, 1))
     assert a["Gross income from operations"] == D("60000.00")
     assert a["Income tax due (the higher of the two)"] == D("15000.00")
@@ -180,5 +180,5 @@ def test_tax_pages(client):
                                              "percentage_rate": "3"})
     assert r.status_code == 302
     assert "Regular income tax (20%" in client.get("/taxes/1702Q?year=2024&n=1").get_data(as_text=True)
-    client.post("/accounts/5100", data={"name": "Rent Expense", "active": "1", "is_cost": "1"})
-    assert 'name="is_cost" value="1" form="acct-5100" checked' in client.get("/accounts").get_data(as_text=True)
+    client.post("/accounts/61270", data={"name": "Rent Expense", "active": "1", "is_cost": "1"})
+    assert 'name="is_cost" value="1" form="acct-61270" checked' in client.get("/accounts").get_data(as_text=True)
