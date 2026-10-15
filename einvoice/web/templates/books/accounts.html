@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Chart of accounts{% endblock %}
+{% block content %}
+<div class="heading with-actions">
+  <div>
+    <h1>Chart of accounts</h1>
+    <p class="muted">A starting set; Micronet's accountant should match it to the current manual books.
+      Accounts marked <strong>auto</strong> are used by the automatic postings and stay active.
+      Codes can't change once created.</p>
+  </div>
+  <div class="actions">
+    <a href="{{ url_for('books.customers') }}">Clients</a>
+    <a href="{{ url_for('books.suppliers') }}">Suppliers</a>
+  </div>
+</div>
+
+<table class="grid compact">
+  <thead><tr><th>Code</th><th>Name</th><th>Type</th><th></th><th>Active</th><th></th></tr></thead>
+  <tbody>
+  {% for a in accounts %}
+    <tr class="{{ '' if a.active else 'cancelled' }}">
+      <td>{{ a.code }}</td>
+      <td colspan="1">
+        <form method="post" action="{{ url_for('books.update_account', code=a.code) }}" class="inline-form" id="acct-{{ a.code }}">
+          <input type="text" name="name" value="{{ a.name }}" maxlength="100">
+        </form>
+      </td>
+      <td>{{ a.type }}</td>
+      <td>{% if a.role %}<span class="badge vat">auto</span>{% endif %}
+          {% if a.is_cash %}<span class="badge ex">cash</span>{% endif %}
+          {% if a.code in used %}<small class="muted">in use</small>{% endif %}</td>
+      <td><input type="checkbox" name="active" value="1" form="acct-{{ a.code }}" {{ 'checked' if a.active }} {{ 'disabled' if a.role }}>
+          {% if a.role %}<input type="hidden" name="active" value="1" form="acct-{{ a.code }}">{% endif %}</td>
+      <td><button class="link" type="submit" form="acct-{{ a.code }}">Save</button></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<form method="post" action="{{ url_for('books.add_account') }}" class="card">
+  <h2>Add an account</h2>
+  <div class="filters">
+    <label class="field"><span>Code <em>*</em></span><input name="code" inputmode="numeric" maxlength="8" required></label>
+    <label class="field" style="flex: 1"><span>Name <em>*</em></span><input name="name" maxlength="100" required></label>
+    <label class="field"><span>Type <em>*</em></span>
+      <select name="type">{% for t in types %}<option>{{ t }}</option>{% endfor %}</select></label>
+    <label class="field"><span>Cash / bank account</span><input type="checkbox" name="is_cash" value="1" style="width:auto"></label>
+    <div class="quick"><button class="button" type="submit">Add account</button></div>
+  </div>
+</form>
+{% endblock %}

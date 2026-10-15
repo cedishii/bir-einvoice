@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}{{ r.title }}{% endblock %}
+{% block content %}
+{% set args = {"from": start, "to": end, "party": party or "", "account": account or ""} %}
+<div class="heading with-actions">
+  <div>
+    <h1>{{ r.title }}</h1>
+    <p class="muted">{{ r.period }} · Amounts in PHP</p>
+  </div>
+  <div class="actions">
+    <a href="{{ url_for('books.overview') }}">&larr; Books</a>
+    <a class="button secondary" href="{{ url_for('books.report', key=key, format='csv', **args) }}">CSV</a>
+    <a class="button" href="{{ url_for('books.report', key=key, format='pdf', **args) }}" target="_blank"
+       data-window-title="{{ r.title }}">PDF / print</a>
+  </div>
+</div>
+
+<form method="get" class="card filters">
+  {% if not as_of %}
+  <label class="field"><span>From</span><input type="date" name="from" value="{{ start }}"></label>
+  {% endif %}
+  <label class="field"><span>{{ "As of" if as_of else "To" }}</span><input type="date" name="to" value="{{ end }}"></label>
+  {% if key == "gl" %}
+  <label class="field"><span>Account</span>
+    <select name="account"><option value="">All accounts</option>
+      {% for a in accounts %}<option value="{{ a.code }}" {{ 'selected' if account == a.code }}>{{ a.code }} {{ a.name }}</option>{% endfor %}
+    </select></label>
+  {% endif %}
+  {% if parties %}
+  <label class="field"><span>{{ "Client" if key in ("ar", "wt-received") else "Supplier" }}</span>
+    <select name="party"><option value="">All</option>
+      {% for p in parties %}<option value="{{ p.id }}" {{ 'selected' if party == p.id }}>{{ p.name }}</option>{% endfor %}
+    </select></label>
+  {% endif %}
+  <div class="quick">
+    <button class="button secondary" type="submit">Show</button>
+    {% if quarterly %}
+      {% for name, qs, qe in quarters %}
+        <a href="{{ url_for('books.report', key=key, **{'from': qs, 'to': qe}) }}">{{ name }} {{ qs.year }}</a>
+      {% endfor %}
+    {% endif %}
+  </div>
+</form>
+
+<div class="scroll-x">
+<table class="grid compact">
+  <thead><tr>{% for c in r.columns %}<th class="{{ c.align }}">{{ c.label }}</th>{% endfor %}</tr></thead>
+  <tbody>
+  {% for row in r.rows %}
+    {% if row.kind == "group" %}
+      <tr class="group"><td colspan="{{ r.columns | length }}">{{ row.cells[0] }}</td></tr>
+    {% else %}
+      <tr class="{{ row.kind }}">{% for c in r.columns %}<td class="{{ c.align }}">{{ cell(row.cells[loop.index0]) }}</td>{% endfor %}</tr>
+    {% endif %}
+  {% else %}
+    <tr><td colspan="{{ r.columns | length }}" class="muted">No entries in this period.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% for n in r.notes %}<p class="muted">{{ n }}</p>{% endfor %}
+{% endblock %}

@@ -3,7 +3,9 @@
 A small local app for **Micronet Software Manila, Inc.** It issues VATable,
 zero-rated or VAT-exempt **Service Invoices**, mainly to clients in Japan, billed in JPY with the PHP equivalent,
 prints them as PDF, and exports each one as an e-invoice in BIR's Electronic
-Invoicing System (EIS) JSON format v2.1, checked by a built-in validator.
+Invoicing System (EIS) JSON format v2.1, checked by a built-in validator. It also
+keeps the **books of accounts** (journals, ledgers) and produces the BIR summary
+lists (SLS, SLP) and Form 2307 figures, as a computerized accounting system (CAS).
 
 This is a **prototype**. The company is not required to use EIS yet. Until BIR
 issues the EIS Certification ID and PTU number, printed invoices carry a
@@ -14,6 +16,7 @@ issues the EIS Certification ID and PTU number, printed invoices carry a
 | 1 | Invoice entry, saved invoices, printable PDF | done |
 | 2 | EIS JSON export + validator | done |
 | 3 | Sign / encrypt / send to BIR, fetch results | built; needs EIS enrollment to use |
+| 4 | Books of accounts, SLS / SLP, Form 2307 data | built; RELIEF .DAT files wait for BIR's official layout |
 
 ## Open it (Windows)
 
@@ -116,6 +119,47 @@ Some protocol details are marked *unconfirmed* on the BIR page. See
   (0%)** or **VAT-Exempt**. Prices are entered net of VAT; for VATable sales 12%
   VAT is added on top of the total (in JPY for the client, in PHP for BIR).
   Zero-rated and exempt invoices have VAT 0.00.
+
+## Books of accounts
+
+Everything is in PHP and posted as double entry, each in its own book:
+
+| What happens | Book | Entry |
+|---|---|---|
+| Invoice issued | Sales Journal (SJ) | Accounts Receivable / Service Income, Output VAT |
+| Invoice voided | General Journal (GJ) | reverses the SJ entry |
+| **Collections** → Record collection | Cash Receipts Journal (CRJ) | Cash, Creditable Withholding Tax / Accounts Receivable; the difference from the invoice's PHP amount is a foreign exchange gain or loss |
+| **Supplier bills** → Record bill | Purchase Journal (PJ) | expense or asset, Input VAT / Accounts Payable |
+| **Payments** → Record payment | Cash Disbursements Journal (CDJ) | Accounts Payable / Cash, Withholding Tax Payable |
+| **Journal entries** → Manual entry | CRJ / CDJ if it moves cash in / out, else GJ | anything else: payroll, bank charges, depreciation, adjustments |
+
+- **Posted entries are final.** The database refuses changes. A mistake is
+  fixed by cancelling the collection / bill / payment, voiding the invoice, or
+  reversing the manual entry. Each of these posts a reversing entry and keeps the original.
+- **Integrity check.** Each entry carries a SHA-256 hash of itself and of the
+  entry before it. **Books & reports** shows whether anything was changed,
+  removed or inserted outside the app.
+- **Audit trail** of every posting, cancellation, setting change, printout and
+  export, with the Windows user name.
+- **Close period** stops anything from being posted on or before a date (after filing).
+- **Opening balances** from the manual books: a manual entry with "Opening
+  balances" ticked (General Journal). One entry per client / supplier for
+  receivables / payables, so their subsidiary ledgers start right.
+- **Accounts & parties**: chart of accounts (a starting set, to be matched to
+  the accountant's), suppliers, and clients (kept from the invoices).
+
+**Books & reports** opens each book on screen, as PDF (company name, TIN, page
+"x of y", PTU number on every page) and as CSV: the five journals, General
+Ledger, Accounts Receivable / Payable subsidiary ledgers, Trial Balance, audit
+trail. Per quarter: Summary List of Sales, Summary List of Purchases, tax
+withheld from suppliers (the Form 2307s Micronet issues) and tax withheld by
+clients (the 2307s Micronet receives). **Download the year's books (ZIP)** has
+all of them as PDF and CSV, with SHA-256 checksums, for the yearly submission of
+computerized books.
+
+Not built: the RELIEF `.DAT` files (BIR's validation module accepts only its
+exact layout, which we don't have yet) and printing the official Form 2307
+(the report gives its Part II figures).
 
 ## Settings (`.env`)
 

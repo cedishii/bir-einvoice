@@ -7,7 +7,8 @@ import string
 from datetime import date, datetime
 from decimal import Decimal
 
-from ..models import PH_TZ, Invoice, InvoiceLine
+from ..books import postings
+from ..models import PH_TZ, Invoice, InvoiceLine, today_ph
 from . import control_numbers
 
 EIS_KEY_ALPHABET = string.ascii_uppercase + string.digits
@@ -62,6 +63,7 @@ class Repository:
                     (invoice.id, no, line.item_name, line.description, str(line.qty),
                      line.unit, str(line.unit_cost_jpy), str(line.amount_jpy),
                      str(line.unit_cost_php), str(line.sales_php)))
+            postings.post_invoice(conn, invoice)  # Sales Journal
             conn.execute("COMMIT")
         except Exception:
             conn.execute("ROLLBACK")
@@ -91,12 +93,16 @@ class Repository:
             raise ValueError(f"Invoice {control_no} has already been exported to EIS "
                              "JSON and can't simply be voided. Corrections (credit "
                              "memos / cancellations) are not built yet.")
-        cur = self.conn.execute(
-            """UPDATE invoices SET status = 'void', void_reason = ?, voided_at = ?
-               WHERE control_no = ? AND status = 'issued'""",
-            (reason, _now(), control_no))
-        if cur.rowcount != 1:
-            raise ValueError(f"Invoice {control_no} is not an issued invoice.")
+        with postings.transaction(self.conn):
+            cur = self.conn.execute(
+                """UPDATE invoices SET status = 'void', void_reason = ?, voided_at = ?
+                   WHERE control_no = ? AND status = 'issued'""",
+                (reason, _now(), control_no))
+            if cur.rowcount != 1:
+                raise ValueError(f"Invoice {control_no} is not an issued invoice.")
+            invoice_id = self.conn.execute("SELECT id FROM invoices WHERE control_no = ?",
+                                           (control_no,)).fetchone()["id"]
+            postings.post_invoice_void(self.conn, invoice_id, reason, on=today_ph())
         return self.get(control_no)
 
     def get(self, control_no: str) -> Invoice | None:

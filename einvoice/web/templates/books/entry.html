@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}{{ e.book }}-{{ e.entry_no }}{% endblock %}
+{% block content %}
+<div class="heading">
+  <h1>{{ books[e.book] }} {{ e.book }}-{{ e.entry_no }}</h1>
+  <p class="muted">{{ e.entry_date }} · posted {{ e.created_at.replace("T", " ") }} by {{ e.created_by }}</p>
+</div>
+
+<section class="card">
+  <dl>
+    <dt>Particulars</dt><dd>{{ e.particulars }}</dd>
+    <dt>Reference</dt><dd>{{ e.reference or "-" }}</dd>
+    {% if party %}<dt>{{ e.party_type | capitalize }}</dt><dd>{{ party }}</dd>{% endif %}
+    <dt>Source</dt><dd>
+      {% if invoice_no %}<a href="{{ url_for('show_invoice', control_no=invoice_no) }}">Service Invoice {{ invoice_no }}</a>
+      {% elif e.source_type == "collection" %}<a href="{{ url_for('books.collections') }}">Collection</a>
+      {% elif e.source_type == "bill" %}<a href="{{ url_for('books.bills') }}">Supplier bill</a>
+      {% elif e.source_type == "payment" %}<a href="{{ url_for('books.payments') }}">Payment</a>
+      {% elif reverses %}Reverses <a href="{{ url_for('books.show_entry', entry_id=reverses.id) }}">{{ reverses.book }}-{{ reverses.entry_no }}</a>
+      {% elif e.source_type == "opening" %}Opening balances
+      {% else %}Manual entry{% endif %}</dd>
+    {% if reversal %}<dt>Reversed by</dt>
+      <dd><a href="{{ url_for('books.show_entry', entry_id=reversal.id) }}">{{ reversal.book }}-{{ reversal.entry_no }}</a> on {{ reversal.entry_date }}</dd>{% endif %}
+  </dl>
+
+  <table class="grid compact">
+    <thead><tr><th>Account</th><th>Memo</th><th class="num">Debit</th><th class="num">Credit</th></tr></thead>
+    <tbody>
+    {% for l in lines %}
+      <tr><td>{{ l.account_code }} {{ l.account_name }}</td><td>{{ l.memo }}</td>
+        <td class="num">{{ fmt(D(l.debit)) if D(l.debit) else "" }}</td>
+        <td class="num">{{ fmt(D(l.credit)) if D(l.credit) else "" }}</td></tr>
+    {% endfor %}
+    </tbody>
+    <tfoot><tr class="total"><td colspan="2">Total</td>
+      <td class="num">{{ fmt(total) }}</td><td class="num">{{ fmt(total) }}</td></tr></tfoot>
+  </table>
+  <p class="hash">Hash {{ e.hash }}</p>
+</section>
+
+{% if e.source_type in ("manual", "opening") and not reversal %}
+<details class="card danger">
+  <summary>Reverse this entry</summary>
+  <p class="muted">Posts the mirror image in the General Journal, dated today. The original stays in the books.</p>
+  <form method="post" action="{{ url_for('books.reverse_entry', entry_id=e.id) }}" class="inline-form">
+    <input type="text" name="reason" placeholder="Reason" required>
+    <button class="button danger" type="submit">Post reversing entry</button>
+  </form>
+</details>
+{% endif %}
+{% endblock %}

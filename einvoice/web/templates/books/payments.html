@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% from "books/_macros.html" import cancel_form %}
+{% block title %}Payments{% endblock %}
+{% block content %}
+<div class="heading with-actions">
+  <div>
+    <h1>Payments to suppliers</h1>
+    <p class="muted">Each one posts to the Cash Disbursements Journal. Tax withheld goes to Withholding Tax Payable
+      and into the Form 2307 report.</p>
+  </div>
+  <div class="actions"><a class="button" href="{{ url_for('books.new_payment') }}">+ Record payment</a></div>
+</div>
+{% if rows %}
+<table class="grid compact">
+  <thead><tr><th>Date</th><th>Reference</th><th>Supplier</th><th>Bill</th><th class="num">Settled</th>
+    <th class="num">Tax withheld</th><th class="num">Cash paid</th><th>Status</th><th></th></tr></thead>
+  <tbody>
+  {% for p in rows %}
+    <tr class="{{ p.status }}">
+      <td>{{ p.pay_date }}</td><td>{{ p.reference }}</td><td>{{ p.supplier }}</td>
+      <td>{{ p.supplier_ref or "on account" }}</td>
+      <td class="num">{{ fmt(D(p.amount)) }}</td>
+      <td class="num">{{ fmt(D(p.ewt)) }}{% if p.atc %} <small class="muted">{{ p.atc }}</small>{% endif %}</td>
+      <td class="num">{{ fmt(D(p.amount) - D(p.ewt)) }}</td>
+      <td><span class="badge {{ p.status }}">{{ p.status }}</span>
+        {% if p.cancel_reason %}<small class="muted block">{{ p.cancel_reason }}</small>{% endif %}</td>
+      <td>{% if p.status == "posted" %}{{ cancel_form(url_for('books.cancel', kind='payment', doc_id=p.id), "payment") }}{% endif %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty">No payments recorded yet.</p>
+{% endif %}
+{% endblock %}

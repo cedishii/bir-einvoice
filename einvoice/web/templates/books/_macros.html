@@ -1,0 +1,26 @@
+{% macro errors_box(errors) %}
+{% if errors %}
+<div class="flash error">
+  Please fix the following:
+  <ul>{% for msg in errors.values() %}<li>{{ msg }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+{% endmacro %}
+
+{% macro input(data, errors, name, label, type="text", hint="", required=True, attrs="") %}
+<label class="field {{ 'has-error' if errors.get(name) }}">
+  <span>{{ label }}{% if required %} <em>*</em>{% endif %}</span>
+  <input type="{{ type }}" name="{{ name }}" value="{{ data.get(name, '') }}" {{ attrs | safe }}>
+  {% if hint %}<small>{{ hint }}</small>{% endif %}
+</label>
+{% endmacro %}
+
+{% macro cancel_form(action, what) %}
+<details class="cancel">
+  <summary class="muted">Cancel</summary>
+  <form method="post" action="{{ action }}" class="inline-form">
+    <input type="text" name="reason" placeholder="Reason" required>
+    <button class="button danger" type="submit">Cancel {{ what }}</button>
+  </form>
+</details>
+{% endmacro %}

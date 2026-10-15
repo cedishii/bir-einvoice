@@ -197,3 +197,34 @@ pre.json { background: #1e1e24; color: #e8e8ee; padding: 16px 20px; border-radiu
 .badge.eis-sent { background: #fff6d6; color: #8a6d00; }
 .badge.eis-accepted { background: #e8f5ec; color: var(--ok); }
 .badge.eis-rejected { background: #fdecee; color: #8b0000; }
+
+/* Books of accounts */
+.sidebar .nav-section { margin: 14px 18px 4px; font-size: 11px; font-weight: 700; letter-spacing: .08em;
+                        text-transform: uppercase; color: #6d6d75; white-space: nowrap; }
+.heading.with-actions { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+.heading.with-actions .actions { margin: 0; }
+table.grid.compact th, table.grid.compact td { padding: 5px 8px; font-size: 13.5px; }
+table.grid tr.group td { background: #f0f0f2; font-weight: 700; }
+table.grid tr.total td { font-weight: 700; border-top: 2px solid #333; }
+table.grid tr.sub td { color: var(--muted); font-style: italic; }
+tr.cancelled td { color: #999; }
+.badge.cancelled { background: #eee; color: #8b0000; }
+.badge.posted { background: #e8f5ec; color: var(--ok); }
+.filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.filters .field { margin: 0; min-width: 150px; }
+.filters .quick { display: flex; gap: 10px; align-items: center; padding-bottom: 10px; }
+.report-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
+.report-list a { display: block; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; text-decoration: none; color: var(--ink); background: #fff; }
+.report-list a:hover { border-color: var(--accent); }
+.report-list small { display: block; color: var(--muted); }
+.ok { color: var(--ok); font-weight: 600; }
+.bad { color: #8b0000; font-weight: 600; }
+.totals-line { display: flex; gap: 24px; justify-content: flex-end; font-variant-numeric: tabular-nums; padding: 8px 0; }
+.totals-line .bad, .totals-line .ok { min-width: 160px; text-align: right; }
+.hash { font-family: Consolas, monospace; font-size: 12px; word-break: break-all; color: var(--muted); }
+.inline-form { display: flex; gap: 8px; align-items: center; margin: 0; }
+.inline-form input[type=text] { width: auto; flex: 1; }
+.inline-form input[type=checkbox] { width: auto; }
+.scroll-x { overflow-x: auto; }
+.sidebar nav { overflow-y: auto; min-height: 0; }
+.sidebar nav a { padding-top: 9px; padding-bottom: 9px; }

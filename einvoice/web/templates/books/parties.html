@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% from "books/_macros.html" import errors_box %}
+{% block title %}{{ "Suppliers" if kind == "supplier" else "Clients" }}{% endblock %}
+{% block content %}
+<div class="heading with-actions">
+  <div>
+    <h1>{{ "Suppliers" if kind == "supplier" else "Clients" }}</h1>
+    <p class="muted">{% if kind == "supplier" %}Their registered name, TIN and address go into the Summary List of
+      Purchases and Form 2307.{% else %}Kept automatically from the invoices (same name and TIN = same client).
+      Their details go into the Summary List of Sales.{% endif %}</p>
+  </div>
+  <div class="actions">
+    <a href="{{ url_for('books.accounts') }}">Chart of accounts</a>
+    <a href="{{ url_for('books.customers' if kind == 'supplier' else 'books.suppliers') }}">{{ "Clients" if kind == "supplier" else "Suppliers" }}</a>
+  </div>
+</div>
+{{ errors_box(errors) }}
+
+{% if rows %}
+<table class="grid compact">
+  <thead><tr><th>Name</th><th>TIN</th><th>Address</th><th></th></tr></thead>
+  <tbody>
+  {% for p in rows %}
+    <tr><td>{{ p.name }}</td><td>{{ tin(p.tin, p.branch) or "none (foreign)" }}</td><td>{{ p.address }}</td>
+      <td><a href="{{ url_for('books.report', key='ap' if kind == 'supplier' else 'ar', party=p.id) }}">Ledger</a></td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty">{{ "No suppliers yet." if kind == "supplier" else "No clients yet. They are added when invoices are issued." }}</p>
+{% endif %}
+
+{% if kind == "supplier" %}
+<form method="post" action="{{ url_for('books.add_supplier') }}" class="card">
+  <h2>Add a supplier</h2>
+  <div class="row">
+    <label class="field"><span>Registered name <em>*</em></span><input name="name" value="{{ data.get('name', '') }}" maxlength="200" required></label>
+    <label class="field"><span>TIN</span><input name="tin" value="{{ data.get('tin', '') }}" placeholder="123-456-789-00000" autocomplete="off">
+      <small>Leave blank for a foreign supplier.</small></label>
+  </div>
+  <label class="field"><span>Address <em>*</em></span><input name="address" value="{{ data.get('address', '') }}" maxlength="300" required></label>
+  <div class="actions"><button class="button" type="submit">Add supplier</button></div>
+</form>
+{% endif %}
+{% endblock %}

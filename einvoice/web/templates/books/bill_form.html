@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% from "books/_macros.html" import errors_box, input %}
+{% block title %}Record supplier bill{% endblock %}
+{% block content %}
+<div class="heading">
+  <h1>Record a supplier bill</h1>
+  <p class="muted">From the supplier's invoice or official receipt. Posted to the Purchase Journal:
+    the expense (or asset) and input VAT against Accounts Payable.</p>
+</div>
+{{ errors_box(errors) }}
+{% if not suppliers %}
+<p class="flash error">Add the supplier first on the <a href="{{ url_for('books.suppliers') }}">Suppliers</a> page.</p>
+{% endif %}
+
+<form method="post" action="{{ url_for('books.create_bill') }}" class="card" novalidate id="bill">
+  <div class="row">
+    <label class="field {{ 'has-error' if errors.get('supplier_id') }}">
+      <span>Supplier <em>*</em></span>
+      <select name="supplier_id">
+        <option value="">Choose the supplier</option>
+        {% for s in suppliers %}<option value="{{ s.id }}" {{ 'selected' if data.supplier_id == s.id | string }}>{{ s.name }}</option>{% endfor %}
+      </select>
+      <small><a href="{{ url_for('books.suppliers') }}">Add a supplier</a></small>
+    </label>
+    {{ input(data, errors, "bill_date", "Date on the supplier's invoice", "date") }}
+  </div>
+  <div class="row">
+    {{ input(data, errors, "supplier_ref", "Supplier's invoice / receipt no.") }}
+    {{ input(data, errors, "description", "Description", attrs='maxlength="200"') }}
+  </div>
+  <div class="row">
+    <label class="field {{ 'has-error' if errors.get('account_code') }}">
+      <span>Charge to account <em>*</em></span>
+      <select name="account_code">
+        <option value="">Choose an account</option>
+        {% for a in accounts %}<option value="{{ a.code }}" {{ 'selected' if data.account_code == a.code }}>{{ a.code }} {{ a.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="field {{ 'has-error' if errors.get('category') }}">
+      <span>Purchase type <em>*</em></span>
+      <select name="category">
+        <option value="">Choose the purchase type</option>
+        {% for k, label in categories.items() %}<option value="{{ k }}" {{ 'selected' if data.category == k }}>{{ label }}</option>{% endfor %}
+      </select>
+      <small>Decides the column in the Summary List of Purchases.</small>
+    </label>
+  </div>
+  <div class="row three">
+    {{ input(data, errors, "net", "Amount net of VAT (PHP)", attrs='class="num" inputmode="decimal"') }}
+    {{ input(data, errors, "vat", "Input VAT (PHP)", required=False, attrs='class="num" inputmode="decimal"',
+             hint="Filled in as 12% for VATable purchases; change it to match the supplier's invoice.") }}
+    <div class="field static"><span>Total payable</span><div id="total">0.00</div></div>
+  </div>
+  <div class="actions">
+    <a href="{{ url_for('books.bills') }}">Cancel</a>
+    <button type="submit" class="button">Record bill</button>
+  </div>
+</form>
+
+<script>
+  const f = document.getElementById("bill");
+  const num = (v) => parseFloat((v || "").replace(/,/g, "")) || 0;
+  const vatable = ["services", "capital", "goods"];
+  f.vat.addEventListener("input", () => f.vat.dataset.typed = "1");
+  function update() {
+    if (!f.vat.dataset.typed)
+      f.vat.value = vatable.includes(f.category.value) && f.net.value
+        ? (Math.round(num(f.net.value) * 12) / 100).toFixed(2) : (f.category.value ? "0.00" : "");
+    document.getElementById("total").textContent =
+      (num(f.net.value) + num(f.vat.value)).toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  }
+  f.addEventListener("input", update);
+  f.addEventListener("change", update);
+  update();
+</script>
+{% endblock %}

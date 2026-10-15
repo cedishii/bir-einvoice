@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% from "books/_macros.html" import errors_box, input %}
+{% block title %}Record payment{% endblock %}
+{% block content %}
+<div class="heading">
+  <h1>Record a payment to a supplier</h1>
+  <p class="muted">Posted to the Cash Disbursements Journal: Accounts Payable against cash, with any tax withheld
+    kept as Withholding Tax Payable (remitted to BIR later, and reported on the supplier's Form 2307).</p>
+</div>
+{{ errors_box(errors) }}
+
+<form method="post" action="{{ url_for('books.create_payment') }}" class="card" novalidate id="pay">
+  <fieldset>
+    <legend>For</legend>
+    <div class="row">
+      <label class="field">
+        <span>Bill</span>
+        <select name="bill_id">
+          <option value="">No bill (on account)</option>
+          {% for b in bills %}
+          <option value="{{ b.id }}" data-balance="{{ b.balance }}" data-net="{{ b.net }}"
+                  {{ 'selected' if data.bill_id == b.id | string }}>{{ b.supplier_name }} · {{ b.supplier_ref }} · unpaid {{ fmt(b.balance) }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="field" id="supplier-field">
+        <span>Supplier <em>*</em></span>
+        <select name="supplier_id">
+          <option value="">Choose the supplier</option>
+          {% for s in suppliers %}<option value="{{ s.id }}" {{ 'selected' if data.supplier_id == s.id | string }}>{{ s.name }}</option>{% endfor %}
+        </select>
+        <small>Only needed without a bill.</small>
+      </label>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Paid</legend>
+    <div class="row three">
+      {{ input(data, errors, "pay_date", "Payment date", "date") }}
+      {{ input(data, errors, "reference", "Reference", hint="Check or transfer number") }}
+      <label class="field">
+        <span>Paid from <em>*</em></span>
+        <select name="cash_account">
+          {% for a in cash_accounts %}<option value="{{ a.code }}" {{ 'selected' if data.cash_account == a.code or (not data.cash_account and a.code == '1020') }}>{{ a.code }} {{ a.name }}</option>{% endfor %}
+        </select>
+      </label>
+    </div>
+    <div class="row">
+      {{ input(data, errors, "amount", "Amount settled (PHP)", attrs='class="num" inputmode="decimal"',
+               hint="What comes off Accounts Payable, including any tax withheld.") }}
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Expanded withholding tax (Form 2307)</legend>
+    <p class="muted">If Micronet withholds tax from this supplier, enter the ATC and rate that apply
+      (ask the accountant). Leave blank otherwise.</p>
+    <div class="row three">
+      {{ input(data, errors, "atc", "ATC", required=False) }}
+      {{ input(data, errors, "ewt_base", "Income payment (PHP)", required=False, attrs='class="num" inputmode="decimal"',
+               hint="Usually the bill amount net of VAT") }}
+      {{ input(data, errors, "ewt_rate", "Rate (%)", required=False, attrs='class="num" inputmode="decimal"') }}
+    </div>
+    <div class="row">
+      {{ input(data, errors, "ewt", "Tax withheld (PHP)", required=False, attrs='class="num" inputmode="decimal"') }}
+    </div>
+  </fieldset>
+
+  <p class="totals-line"><span>Cash paid to the supplier: <strong id="cash">0.00</strong></span></p>
+  <div class="actions">
+    <a href="{{ url_for('books.payments') }}">Cancel</a>
+    <button type="submit" class="button">Record payment</button>
+  </div>
+</form>
+
+<script>
+  const f = document.getElementById("pay");
+  const num = (v) => parseFloat((v || "").replace(/,/g, "")) || 0;
+  function pickBill() {
+    const o = f.bill_id.selectedOptions[0];
+    document.getElementById("supplier-field").style.display = f.bill_id.value ? "none" : "";
+    if (o && o.dataset.balance) {
+      if (!f.amount.value) f.amount.value = o.dataset.balance;
+      if (!f.ewt_base.value) f.ewt_base.value = o.dataset.net;
+    }
+    update();
+  }
+  function update() {
+    if (f.ewt_base.value && f.ewt_rate.value && !f.ewt.dataset.typed)
+      f.ewt.value = (Math.round(num(f.ewt_base.value) * num(f.ewt_rate.value)) / 100).toFixed(2);
+    document.getElementById("cash").textContent = (num(f.amount.value) - num(f.ewt.value))
+      .toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  }
+  f.ewt.addEventListener("input", () => f.ewt.dataset.typed = "1");
+  f.bill_id.addEventListener("change", () => { f.amount.value = ""; f.ewt_base.value = ""; pickBill(); });
+  f.addEventListener("input", update);
+  pickBill();
+</script>
+{% endblock %}

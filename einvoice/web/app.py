@@ -18,9 +18,12 @@ from ..eis.transport import results as eis_results
 from ..eis.transport import service as eis_service
 from ..eis.transport.client import EisApiError, EisClient
 from ..eis.transport.settings import TransportSettings, load_transport_settings
+from ..books import ledger, postings
+from ..books.ledger import BooksError
 from ..pdf.service_invoice import render as render_pdf
 from ..storage.db import connect
 from ..storage.repository import Repository
+from . import books
 
 LINE_FIELDS = ["item_name", "description", "qty", "unit", "unit_cost_jpy"]
 FORM_FIELDS = ["issue_date", "buyer_name", "buyer_tin", "buyer_address",
@@ -52,6 +55,9 @@ def create_app(config: Config | None = None, transport: TransportSettings | None
             g.conn = connect(cfg().db_path)
             g.repo = Repository(g.conn, cfg().control_no_start)
         return g.repo
+
+    app.extensions["einvoice"] = {"repo": repo, "cfg": cfg}
+    app.register_blueprint(books.bp)
 
     @app.teardown_appcontext
     def close_db(_exc):
@@ -162,7 +168,10 @@ def create_app(config: Config | None = None, transport: TransportSettings | None
         if problems:
             return render_form(data, {f"eis{i}": f"BIR e-invoice check: {p}"
                                       for i, p in enumerate(problems)}, status=422)
-        inv = repo().issue(inv)
+        try:
+            inv = repo().issue(inv)
+        except BooksError as e:  # e.g. the invoice date is in a closed period
+            return render_form(data, {"books": str(e)}, status=422)
         issued_tokens[token] = inv.control_no
         flash(f"Service Invoice No. {inv.control_no} issued.")
         if email_settings().auto_send:
@@ -178,7 +187,11 @@ def create_app(config: Config | None = None, transport: TransportSettings | None
     def render_detail(inv, issues=None, status=200):
         exported = eis_export.existing_export(repo().conn, cfg(), inv)
         bir = eis_service.status_of(repo().conn, exported.eis_unique_id) if exported else None
+        books_entry = ledger.entry_for(repo().conn, "invoice", inv.id)
         return render_template("detail.html", inv=inv, exported=exported, bir=bir,
+                               books_entry=books_entry,
+                               books_reversal=books_entry and ledger.reversal_of(repo().conn, books_entry["id"]),
+                               balance=postings.invoice_balance(repo().conn, inv.id),
                                emails=emailer.history(repo().conn, inv),
                                issues=issues or [], eis_id=_eis_id(inv)), status
 

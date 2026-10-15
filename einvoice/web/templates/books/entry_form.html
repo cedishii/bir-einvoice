@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% from "books/_macros.html" import errors_box, input %}
+{% block title %}Manual journal entry{% endblock %}
+{% block content %}
+<div class="heading">
+  <h1>Manual journal entry</h1>
+  <p class="muted">Goes to the Cash Receipts Journal when it brings cash into a cash / bank account, the Cash
+    Disbursements Journal when it pays cash out, and the General Journal otherwise. Once posted it can't be
+    changed, only reversed.</p>
+</div>
+{{ errors_box(errors) }}
+
+<form method="post" action="{{ url_for('books.create_entry') }}" class="card" novalidate>
+  <div class="row three">
+    {{ input(data, errors, "entry_date", "Date", "date") }}
+    {{ input(data, errors, "reference", "Reference", required=False, hint="e.g. voucher, check or deposit slip number") }}
+    {{ input(data, errors, "particulars", "Particulars", attrs='maxlength="300"') }}
+  </div>
+  <label class="field">
+    <span>Client or supplier</span>
+    <select name="party">
+      <option value="">None</option>
+      {% if customers %}<optgroup label="Clients">
+        {% for c in customers %}<option value="customer:{{ c.id }}" {{ 'selected' if data.party == 'customer:' ~ c.id }}>{{ c.name }}</option>{% endfor %}
+      </optgroup>{% endif %}
+      {% if suppliers %}<optgroup label="Suppliers">
+        {% for s in suppliers %}<option value="supplier:{{ s.id }}" {{ 'selected' if data.party == 'supplier:' ~ s.id }}>{{ s.name }}</option>{% endfor %}
+      </optgroup>{% endif %}
+    </select>
+    <small>Choose one when the entry touches Accounts Receivable or Payable, so it shows in that party's subsidiary ledger.</small>
+  </label>
+  <label class="field"><span><input type="checkbox" name="opening" value="1" style="width:auto" {{ 'checked' if data.opening }}>
+    Opening balances</span>
+    <small>Balances carried over from the manual books when switching to this system. Always posted to the General Journal.
+      Post one entry per client / supplier for receivables and payables, so their subsidiary ledgers start right.</small></label>
+
+  <table class="lines" id="lines">
+    <thead><tr><th class="wide">Account <em>*</em></th><th>Debit</th><th>Credit</th><th>Memo</th><th></th></tr></thead>
+    <tbody>
+    {% for row in data.rows %}
+      <tr class="{{ 'has-error' if errors.get('line' ~ loop.index) }}">
+        <td><select name="account[]">
+          <option value="">Choose an account</option>
+          {% for a in accounts %}<option value="{{ a.code }}" {{ 'selected' if row[0] == a.code }}>{{ a.code }} {{ a.name }}</option>{% endfor %}
+        </select></td>
+        <td><input name="debit[]" value="{{ row[1] }}" class="num" inputmode="decimal"></td>
+        <td><input name="credit[]" value="{{ row[2] }}" class="num" inputmode="decimal"></td>
+        <td><input name="memo[]" value="{{ row[3] }}" maxlength="100"></td>
+        <td><button type="button" class="link remove" title="Remove line">&times;</button></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <button type="button" class="link" id="add-line">+ Add line</button>
+  <div class="totals-line"><span>Debits <strong id="t-dr">0.00</strong></span>
+    <span>Credits <strong id="t-cr">0.00</strong></span><span id="t-diff"></span></div>
+
+  <div class="actions">
+    <a href="{{ url_for('books.entries') }}">Cancel</a>
+    <button type="submit" class="button" onclick="return confirm('Post this entry? Posted entries cannot be changed.')">Post entry</button>
+  </div>
+</form>
+
+<script>
+  const tbody = document.querySelector("#lines tbody");
+  const num = (v) => parseFloat((v || "").replace(/,/g, "")) || 0;
+  const cents = (n) => Math.round(n * 100);
+  const show = (c) => (c / 100).toLocaleString("en-US", {minimumFractionDigits: 2});
+  function totals() {
+    let dr = 0, cr = 0;
+    tbody.querySelectorAll("tr").forEach(r => {
+      dr += cents(num(r.querySelector('[name="debit[]"]').value));
+      cr += cents(num(r.querySelector('[name="credit[]"]').value));
+    });
+    document.getElementById("t-dr").textContent = show(dr);
+    document.getElementById("t-cr").textContent = show(cr);
+    const d = document.getElementById("t-diff");
+    d.textContent = dr === cr ? (dr ? "Balanced" : "") : "Off by " + show(Math.abs(dr - cr));
+    d.className = dr === cr ? "ok" : "bad";
+  }
+  tbody.addEventListener("input", totals);
+  document.getElementById("add-line").addEventListener("click", () => {
+    const row = tbody.rows[tbody.rows.length - 1].cloneNode(true);
+    row.classList.remove("has-error");
+    row.querySelectorAll("input").forEach(i => i.value = "");
+    row.querySelector("select").value = "";
+    tbody.appendChild(row);
+  });
+  tbody.addEventListener("click", (e) => {
+    if (!e.target.classList.contains("remove")) return;
+    if (tbody.rows.length > 2) e.target.closest("tr").remove();
+    totals();
+  });
+  totals();
+</script>
+{% endblock %}

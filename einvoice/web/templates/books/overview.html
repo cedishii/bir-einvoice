@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Books &amp; reports{% endblock %}
+{% block content %}
+<div class="heading">
+  <h1>Books of Accounts</h1>
+  <p class="muted">Kept automatically from invoices, collections, supplier bills, payments and
+    journal entries. Amounts in PHP. Posted entries can't be changed; mistakes are reversed.</p>
+</div>
+
+<section class="card">
+  <h2>Integrity</h2>
+  {% if problems %}
+    <p class="bad">The journal check FAILED. The database was changed outside the app:</p>
+    <ul>{% for p in problems %}<li>{{ p }}</li>{% endfor %}</ul>
+  {% else %}
+    <p><span class="ok">Journal check OK.</span>
+      <span class="muted">Every entry balances and none was changed, removed or inserted after posting.</span></p>
+  {% endif %}
+  <p class="muted">Entries per book:
+    {% for k, n in counts.items() %}{{ k }} {{ n }}{{ ", " if not loop.last }}{% endfor %}.
+    Books closed through: <strong>{{ closed or "not closed yet" }}</strong>.</p>
+</section>
+
+<section class="card">
+  <h2>Books</h2>
+  <form method="get" class="filters">
+    <label class="field"><span>From</span><input type="date" name="from" value="{{ start }}"></label>
+    <label class="field"><span>To</span><input type="date" name="to" value="{{ end }}"></label>
+    <div class="quick"><button class="button secondary" type="submit">Set period</button></div>
+  </form>
+  <p class="muted">{{ start.strftime("%B %d, %Y") }} to {{ end.strftime("%B %d, %Y") }}. Each book opens on screen, with PDF (to print) and CSV (for Excel).</p>
+  <ul class="report-list">
+    {% for key in ["SJ", "PJ", "CRJ", "CDJ", "GJ", "gl", "ar", "ap", "tb", "audit"] %}
+    <li><a href="{{ url_for('books.report', key=key, **{'from': start, 'to': end}) }}">
+      {{ reports[key] }}
+      <small>{% if key == "tb" %}as of {{ end }}{% elif key in counts %}{{ counts[key] }} entries in total{% else %}&nbsp;{% endif %}</small></a></li>
+    {% endfor %}
+  </ul>
+</section>
+
+<section class="card">
+  <h2>BIR reports, {{ year }}</h2>
+  <table class="grid compact">
+    <thead><tr><th>Quarter</th><th>SLS</th><th>SLP</th><th>2307 to issue (suppliers)</th><th>2307 received (clients)</th></tr></thead>
+    <tbody>
+    {% for name, qs, qe in quarters %}
+      <tr>
+        <td>{{ name }} <small class="muted">{{ qs.strftime("%b") }}&ndash;{{ qe.strftime("%b") }}</small></td>
+        {% for key in quarterly %}
+        <td><a href="{{ url_for('books.report', key=key, **{'from': qs, 'to': qe}) }}">View</a> ·
+            <a href="{{ url_for('books.report', key=key, format='csv', **{'from': qs, 'to': qe}) }}">CSV</a></td>
+        {% endfor %}
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <p class="muted"><strong>RELIEF data files (.DAT):</strong> not generated yet. BIR's validation module
+    accepts only its exact file layout, and we don't have the official layout to build it from. The SLS and SLP
+    above carry the same figures; they can be keyed into BIR's RELIEF / DEV module.<br>
+    <strong>Form 2307:</strong> the reports give the figures for Part II (per payee, ATC and month). The app does not print the official form.</p>
+</section>
+
+<section class="card">
+  <h2>Year-end</h2>
+  <form method="get" action="{{ url_for('books.archive') }}" class="filters">
+    <label class="field"><span>Year</span>
+      <select name="year">{% for y in years %}<option>{{ y }}</option>{% endfor %}</select></label>
+    <div class="quick"><button class="button" type="submit">Download the year's books (ZIP)</button></div>
+  </form>
+  <p class="muted">All journals, ledgers, the trial balance, the quarterly BIR reports and the audit trail as PDF and CSV,
+    with a manifest of SHA-256 checksums. This is what goes on the disc for the yearly submission of computerized books.</p>
+
+  <form method="post" action="{{ url_for('books.close_books') }}" class="filters"
+        onsubmit="return confirm('Close the books through ' + this.through.value + '? Nothing can be posted on or before that date afterwards, and this cannot be undone.')">
+    <label class="field"><span>Close the books through</span>
+      <input type="date" name="through" value="{{ closed or '' }}" required></label>
+    <div class="quick"><button class="button secondary" type="submit">Close period</button></div>
+  </form>
+  <p class="muted">After a month or year is filed, close it so nothing can be posted back into it. Corrections then go into the open period.</p>
+</section>
+{% endblock %}

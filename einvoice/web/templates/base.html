@@ -42,6 +42,25 @@
       <a href="{{ url_for('bir_page') }}" title="BIR" class="{{ 'active' if ep.startswith('bir') }}">
         <span class="icon">&#8645;</span><span class="label">BIR
         {% if not transport.is_sandbox %}<span class="badge live">LIVE</span>{% endif %}</span></a>
+      <div class="nav-section label">Books</div>
+      <a href="{{ url_for('books.collections') }}" title="Collections"
+         class="{{ 'active' if ep.startswith('books.') and 'collection' in ep }}">
+        <span class="icon">&#8601;</span><span class="label">Collections</span></a>
+      <a href="{{ url_for('books.bills') }}" title="Supplier bills"
+         class="{{ 'active' if ep.startswith('books.') and 'bill' in ep }}">
+        <span class="icon">&#9636;</span><span class="label">Supplier bills</span></a>
+      <a href="{{ url_for('books.payments') }}" title="Payments"
+         class="{{ 'active' if ep.startswith('books.') and 'payment' in ep }}">
+        <span class="icon">&#8599;</span><span class="label">Payments</span></a>
+      <a href="{{ url_for('books.entries') }}" title="Journal entries"
+         class="{{ 'active' if ep in ('books.entries', 'books.new_entry', 'books.create_entry', 'books.show_entry') }}">
+        <span class="icon">&#9998;</span><span class="label">Journal entries</span></a>
+      <a href="{{ url_for('books.overview') }}" title="Books &amp; BIR reports"
+         class="{{ 'active' if ep in ('books.overview', 'books.report') }}">
+        <span class="icon">&#9783;</span><span class="label">Books &amp; reports</span></a>
+      <a href="{{ url_for('books.accounts') }}" title="Setup"
+         class="{{ 'active' if ep in ('books.accounts', 'books.suppliers', 'books.customers') }}">
+        <span class="icon">&#9881;</span><span class="label">Accounts &amp; parties</span></a>
     </nav>
     <div class="sidebar-foot label">
       {% if cfg.is_prototype %}<span class="badge unconfirmed">prototype</span>{% endif %}

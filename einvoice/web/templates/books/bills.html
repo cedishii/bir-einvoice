@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% from "books/_macros.html" import cancel_form %}
+{% block title %}Supplier bills{% endblock %}
+{% block content %}
+<div class="heading with-actions">
+  <div>
+    <h1>Supplier bills</h1>
+    <p class="muted">Invoices and receipts from suppliers (purchases and expenses). Each one posts to the Purchase
+      Journal and feeds the Summary List of Purchases.</p>
+  </div>
+  <div class="actions">
+    <a href="{{ url_for('books.suppliers') }}">Suppliers</a>
+    <a class="button" href="{{ url_for('books.new_bill') }}">+ Record bill</a>
+  </div>
+</div>
+{% if rows %}
+<table class="grid compact">
+  <thead><tr><th>Date</th><th>Supplier</th><th>Their no.</th><th>Description</th><th>Type</th>
+    <th class="num">Net</th><th class="num">VAT</th><th class="num">Total</th><th class="num">Unpaid</th><th>Status</th><th></th></tr></thead>
+  <tbody>
+  {% for b in rows %}
+    <tr class="{{ b.status }}">
+      <td>{{ b.bill_date }}</td><td>{{ b.supplier }}</td><td>{{ b.supplier_ref }}</td><td>{{ b.description }}</td>
+      <td><small>{{ categories[b.category] }}</small></td>
+      <td class="num">{{ fmt(D(b.net)) }}</td><td class="num">{{ fmt(D(b.vat)) }}</td><td class="num">{{ fmt(D(b.total)) }}</td>
+      <td class="num">{% if balances[b.id] %}<a href="{{ url_for('books.new_payment', bill=b.id) }}" title="Pay">{{ fmt(balances[b.id]) }}</a>{% else %}-{% endif %}</td>
+      <td><span class="badge {{ b.status }}">{{ b.status }}</span>
+        {% if b.cancel_reason %}<small class="muted block">{{ b.cancel_reason }}</small>{% endif %}</td>
+      <td>{% if b.status == "posted" %}{{ cancel_form(url_for('books.cancel', kind='bill', doc_id=b.id), "bill") }}{% endif %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty">No supplier bills yet. <a href="{{ url_for('books.new_bill') }}">Record the first one</a>.</p>
+{% endif %}
+{% endblock %}

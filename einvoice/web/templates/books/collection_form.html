@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% from "books/_macros.html" import errors_box, input %}
+{% block title %}Record collection{% endblock %}
+{% block content %}
+<div class="heading">
+  <h1>Record a collection</h1>
+  <p class="muted">Money received from a client, in PHP as credited to the bank. Posted to the Cash Receipts Journal.</p>
+</div>
+{{ errors_box(errors) }}
+
+<form method="post" action="{{ url_for('books.create_collection') }}" class="card" novalidate id="coll">
+  <fieldset>
+    <legend>For</legend>
+    <div class="row">
+      <label class="field {{ 'has-error' if errors.get('invoice_id') }}">
+        <span>Invoice</span>
+        <select name="invoice_id">
+          <option value="">No invoice (on account)</option>
+          {% for i in invoices %}
+          <option value="{{ i.id }}" data-balance="{{ i.balance }}" data-net="{{ i.net_php }}"
+                  {{ 'selected' if data.invoice_id == i.id | string }}>{{ i.control_no }} · {{ i.buyer_name }} · balance {{ fmt(i.balance) }}</option>
+          {% endfor %}
+        </select>
+        <small>Only invoices with a balance are listed.</small>
+      </label>
+      <label class="field" id="customer-field">
+        <span>Client <em>*</em></span>
+        <select name="customer_id">
+          <option value="">Choose the client</option>
+          {% for c in customers %}<option value="{{ c.id }}" {{ 'selected' if data.customer_id == c.id | string }}>{{ c.name }}</option>{% endfor %}
+        </select>
+        <small>Only needed without an invoice.</small>
+      </label>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Received</legend>
+    <div class="row three">
+      {{ input(data, errors, "coll_date", "Date received", "date") }}
+      {{ input(data, errors, "reference", "Reference", hint="Official receipt no. or bank reference") }}
+      <label class="field {{ 'has-error' if errors.get('cash_account') }}">
+        <span>Received into <em>*</em></span>
+        <select name="cash_account">
+          {% for a in cash_accounts %}<option value="{{ a.code }}" {{ 'selected' if data.cash_account == a.code or (not data.cash_account and a.code == '1020') }}>{{ a.code }} {{ a.name }}</option>{% endfor %}
+        </select>
+      </label>
+    </div>
+    <div class="row">
+      {{ input(data, errors, "applied", "Amount applied to the invoice (PHP)", attrs='class="num" inputmode="decimal"',
+               hint="What comes off the client's receivable. Defaults to the invoice balance.") }}
+      {{ input(data, errors, "cash", "Cash received (PHP)", attrs='class="num" inputmode="decimal"',
+               hint="As credited by the bank, after its conversion from JPY.") }}
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Tax withheld by the client (Form 2307)</legend>
+    <p class="muted">Only for clients in the Philippines that withheld tax and gave a Form 2307. Leave blank otherwise.</p>
+    <div class="row three">
+      {{ input(data, errors, "atc", "ATC", required=False, hint="As printed on the 2307") }}
+      {{ input(data, errors, "cwt_base", "Income payment (PHP)", required=False, attrs='class="num" inputmode="decimal"',
+               hint="Amount the tax was withheld on (usually net of VAT)") }}
+      {{ input(data, errors, "cwt_rate", "Rate (%)", required=False, attrs='class="num" inputmode="decimal"') }}
+    </div>
+    <div class="row">
+      {{ input(data, errors, "cwt", "Tax withheld (PHP)", required=False, attrs='class="num" inputmode="decimal"') }}
+    </div>
+  </fieldset>
+
+  <p class="totals-line"><span id="fx"></span></p>
+  <div class="actions">
+    <a href="{{ url_for('books.collections') }}">Cancel</a>
+    <button type="submit" class="button">Record collection</button>
+  </div>
+</form>
+
+<script>
+  const f = document.getElementById("coll");
+  const num = (v) => parseFloat((v || "").replace(/,/g, "")) || 0;
+  const two = (n) => n.toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  function pickInvoice() {
+    const o = f.invoice_id.selectedOptions[0];
+    document.getElementById("customer-field").style.display = f.invoice_id.value ? "none" : "";
+    if (o && o.dataset.balance) {
+      if (!f.applied.value) f.applied.value = o.dataset.balance;
+      if (!f.cwt_base.value) f.cwt_base.value = o.dataset.net;
+    }
+    update();
+  }
+  function update() {
+    if (f.cwt_base.value && f.cwt_rate.value && !f.cwt.dataset.typed)
+      f.cwt.value = (Math.round(num(f.cwt_base.value) * num(f.cwt_rate.value)) / 100).toFixed(2);
+    const diff = Math.round((num(f.applied.value) - num(f.cash.value) - num(f.cwt.value)) * 100) / 100;
+    const el = document.getElementById("fx");
+    el.textContent = !f.cash.value ? "" : diff > 0 ? "Foreign exchange loss: " + two(diff)
+                   : diff < 0 ? "Foreign exchange gain: " + two(-diff) : "No exchange difference";
+  }
+  f.cwt.addEventListener("input", () => f.cwt.dataset.typed = "1");
+  f.invoice_id.addEventListener("change", () => { f.applied.value = ""; f.cwt_base.value = ""; pickInvoice(); });
+  f.addEventListener("input", update);
+  pickInvoice();
+</script>
+{% endblock %}

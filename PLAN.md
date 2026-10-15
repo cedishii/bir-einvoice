@@ -1,6 +1,6 @@
 # PLAN — BIR e-Invoice prototype (Micronet Software Manila, Inc.)
 
-Status: **approved 2026-10-14.** Phases 1, 2 and 3 built (phase 3 requested by the user after phase 2; untested against the real sandbox until enrollment). Answers to the
+Status: **approved 2026-10-14.** Phases 1 to 4 built (phase 4, books of accounts, on 2026-10-15; section 7) (phase 3 requested by the user after phase 2; untested against the real sandbox until enrollment). Answers to the
 open questions are in section 6.
 
 Main reference: `docs/EIS_SPEC_NOTES.md`. Its "Decisions" section is final.
@@ -195,3 +195,89 @@ Seen on the old receipt (for the record, not used by the app):
   JSON uses "000000000" for Japanese clients; the form's TIN field is for
   Philippine TINs only.
 - The "TOTAL SALES" box says 17,000,000 while every other amount is 12,000,000.
+
+## 7. Phase 4 — CAS: books of accounts and BIR reports (BUILT 2026-10-15)
+
+User, 2026-10-15: "do what you see fit". Nothing connects to BIR: this is not
+an official Micronet system. Built as below, with these choices:
+- `PTU_NUM` (already in `.env`) is the system's PTU / Acknowledgment
+  Certificate number; printed books show it and are watermarked
+  "PROTOTYPE - NOT REGISTERED WITH BIR" while it is a placeholder.
+- Users: the Windows user name goes into the audit trail; no logins of their own.
+- Journal entries carry a SHA-256 hash chain (`ledger.verify`); triggers refuse
+  UPDATE / DELETE on journal tables. Migrations now run with executescript.
+- Collections: `applied` (off AR, PHP at the invoice rate) vs cash received;
+  the difference posts to FX gain / loss automatically.
+- Withholding: ATC and rate are typed by the user (no ATC table is built in).
+  The 2307 report shows income per month of the quarter and tax withheld.
+- Bills have one expense line each. The purchase type decides the SLP column.
+- Reversals are always General Journal. Opening balances: manual entry with
+  "Opening balances" ticked, General Journal, source "opening".
+- SLS / SLP leave voided / cancelled documents out. Foreign clients have a
+  blank TIN in the SLS.
+- Invoices issued before phase 4 are posted once on upgrade (`postings.sync`).
+
+The original proposal follows.
+
+Asked 2026-10-15. BIR requires: books of accounts kept automatically (general
+ledger, subsidiary ledgers, sales / purchase / cash receipts / cash
+disbursements journals) and reports (SLS, SLP, RELIEF data files, Form 2307).
+User's answers: the goal is to register this app with BIR as a CAS
+(Acknowledgment Certificate via ORUS); Micronet keeps manual / loose-leaf books
+today; who issues or receives 2307s is not known yet; no official BIR documents
+for the SLSP DAT layout or the CAS checklist yet. Taxumo was named as a
+reference; its public site lists SLSP/QAP/SAWT attachments and "CAS, CBS, EIS"
+compatibility, not journals or ledgers.
+
+What this changes: the app stops being sales-only. Purchases, payments and
+collections need their own data entry, and everything posts to a double-entry
+ledger.
+
+**Data (new tables)**
+- `accounts`: chart of accounts (code, name, type), seeded with a small default
+  set; the accountant edits it.
+- `customers`, `suppliers`: name, TIN + branch, address (needed for SLS / SLP).
+  Invoices pick a customer instead of retyping the buyer.
+- `journal_entries` + `journal_lines`: book (SJ / PJ / CRJ / CDJ / GJ), number
+  per book (never reused), date, source document, debit / credit lines that must
+  balance. Posted entries are never edited or deleted; a mistake is fixed with a
+  reversing entry. Every posting is in the audit log.
+- `bills` (supplier invoices), `payments` (to suppliers), `collections` (from
+  clients), each with VAT and withholding fields.
+- `audit_log`: who did what and when (needed for CAS).
+
+**Automatic postings**
+- Issue invoice -> SJ: Dr Accounts Receivable / Cr Sales / Cr Output VAT.
+- Void invoice -> GJ reversing entry.
+- Collection -> CRJ: Dr Cash / Dr Creditable Withholding Tax (if the client
+  withheld) / Cr Accounts Receivable.
+- Supplier bill -> PJ: Dr Expense / Dr Input VAT / Cr Accounts Payable.
+- Payment -> CDJ: Dr Accounts Payable / Cr Cash / Cr Withholding Tax Payable.
+- Other entries (payroll, depreciation, adjustments) -> GJ, entered by hand.
+
+**Books and reports (PDF + CSV, each page with company name, TIN, CAS
+registration details)**
+- Sales, Purchase, Cash Receipts, Cash Disbursements and General Journals.
+- General Ledger, Subsidiary Ledgers (AR per customer, AP per supplier), Trial
+  Balance.
+- Year-end export for the yearly submission of computerized books.
+- SLS / SLP per quarter: on screen and CSV first. The RELIEF `.DAT` export is
+  built only from the official BIR layout (never guessed).
+- Form 2307: built once we know which side applies and have the official form.
+
+**Build order**
+1. 4a: chart of accounts, customers / suppliers, ledger engine, automatic SJ
+   postings for invoices (old invoices posted once on upgrade), audit log.
+2. 4b: bills, payments, collections, GJ entry form.
+3. 4c: journals, ledgers, trial balance (PDF / CSV), year-end export.
+4. 4d: SLS / SLP, then DAT and 2307 when the official documents are in hand.
+
+**Open questions (for Micronet's accountant)**
+- Chart of accounts and opening balances from the current manual books.
+- Fiscal year (calendar or other).
+- 2307: do PH clients withhold from Micronet, and does Micronet withhold from
+  its suppliers? Which ATCs?
+- Users: one shared login, or a login per person (CAS normally expects user
+  access control and an audit trail per user)?
+- The official SLSP DAT layout / RELIEF DEV module guide and the RDO's CAS
+  registration checklist.

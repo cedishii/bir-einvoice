@@ -19,6 +19,16 @@
   {% include "_summary.html" %}
 </div>
 
+{% if books_entry %}
+<section class="card">
+  <h2>Books</h2>
+  <p>Sales Journal <a href="{{ url_for('books.show_entry', entry_id=books_entry.id) }}">{{ books_entry.book }}-{{ books_entry.entry_no }}</a>
+    {% if books_reversal %}· reversed by <a href="{{ url_for('books.show_entry', entry_id=books_reversal.id) }}">{{ books_reversal.book }}-{{ books_reversal.entry_no }}</a>{% endif %}
+    {% if inv.status == "issued" %}· to collect: <strong>PHP {{ fmt(balance) }}</strong>
+      {% if balance %}· <a href="{{ url_for('books.new_collection', invoice=inv.id) }}">Record collection</a>{% endif %}{% endif %}</p>
+</section>
+{% endif %}
+
 {% if inv.status == "issued" %}
 <section class="card">
   <h2>E-mail to client</h2>
