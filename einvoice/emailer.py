@@ -9,8 +9,10 @@ e-mail says it was sent automatically and needs no reply.
 """
 from __future__ import annotations
 
+import logging
 import os
 import smtplib
+import time
 import sqlite3
 import ssl
 from dataclasses import dataclass
@@ -25,6 +27,35 @@ from .money import fmt
 from .pdf.service_invoice import render as render_pdf
 
 SECURITY = ("starttls", "ssl", "none")
+RETRY_DELAYS = (3, 9)   # seconds before the 2nd and 3rd try of a failed send
+log = logging.getLogger("einvoice.email")
+
+
+def _temporary(e: Exception) -> bool:
+    """A network hiccup or a "try again later" from the server, not a wrong
+    password or a rejected address (those won't fix themselves)."""
+    if isinstance(e, (smtplib.SMTPServerDisconnected, smtplib.SMTPConnectError)):
+        return True
+    if isinstance(e, smtplib.SMTPResponseException):
+        return 400 <= e.smtp_code < 500
+    if isinstance(e, smtplib.SMTPException):
+        return False                 # e.g. every recipient refused
+    return isinstance(e, OSError)    # network: timed out, refused, reset
+
+
+def send_with_retries(sender, settings, msg, sleep=time.sleep) -> int:
+    """Send, trying again after RETRY_DELAYS on temporary failures. Returns
+    the number of tries; re-raises the last error."""
+    for attempt, delay in enumerate((*RETRY_DELAYS, None), start=1):
+        try:
+            sender(settings, msg)
+            return attempt
+        except (smtplib.SMTPException, OSError) as e:
+            if delay is None or not _temporary(e):
+                raise
+            log.warning("e-mail try %d failed (%s); trying again in %ss", attempt, e, delay)
+            sleep(delay)
+    raise AssertionError("unreachable")
 
 
 @dataclass(frozen=True)
@@ -173,7 +204,7 @@ class EmailResult:
 
 def send_invoice(conn: sqlite3.Connection, inv: Invoice, cfg: Config, settings: EmailSettings,
                  *, to: str | None = None, cc: str = "", automatic: bool = False,
-                 sender: Sender = smtp_send) -> EmailResult:
+                 sender: Sender = smtp_send, sleep=time.sleep) -> EmailResult:
     """Send (and log) the invoice e-mail to `to` (one or more addresses,
     separated by commas or semicolons; default: the client's e-mail), with
     `cc` plus EMAIL_CC. Raises EmailError before sending if it can't be sent;
@@ -192,9 +223,10 @@ def send_invoice(conn: sqlite3.Connection, inv: Invoice, cfg: Config, settings: 
     now = datetime.now(PH_TZ).isoformat(timespec="seconds")
     to_text, cc_text = ", ".join(recipients), ", ".join(copies)
     try:
-        sender(settings, msg)
+        send_with_retries(sender, settings, msg, sleep=sleep)
     except (smtplib.SMTPException, OSError) as e:
         _log(conn, inv, now, to_text, cc_text, msg["Subject"], "failed", str(e), automatic)
+        log.error("invoice %s e-mail to %s failed: %s", inv.control_no, to_text, e)
         raise EmailError(f"Sending failed: {e}") from None
     _log(conn, inv, now, to_text, cc_text, msg["Subject"], "sent", "", automatic)
     return EmailResult(True, to_text, f"E-mailed to {to_text}"

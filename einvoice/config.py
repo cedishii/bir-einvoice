@@ -44,6 +44,8 @@ class Config:
     control_no_start: int
     data_dir: Path
     seller: Seller
+    # A second place for the daily backup (e.g. a OneDrive folder); None = off.
+    backup_copy_dir: Path | None = None
 
     @property
     def placeholders(self) -> list[str]:
@@ -84,4 +86,17 @@ def load_config(env_file: Path | None = None) -> Config:
         control_no_start=int(os.getenv("CONTROL_NO_START", "1")),
         data_dir=data_dir,
         seller=Seller(email=os.getenv("SELLER_EMAIL", "").strip()),
+        backup_copy_dir=_backup_copy_dir(),
     )
+
+
+def _backup_copy_dir() -> Path | None:
+    """BACKUP_COPY_DIR from .env ("off" turns it off); by default a folder in
+    the user's OneDrive, when OneDrive is set up on this computer."""
+    value = os.getenv("BACKUP_COPY_DIR", "").strip()
+    if value.lower() in ("off", "none", "no", "false"):
+        return None
+    if value:
+        return Path(os.path.expandvars(value))
+    onedrive = os.getenv("OneDrive", "").strip()
+    return Path(onedrive) / "Micronet e-Invoice backups" if onedrive else None

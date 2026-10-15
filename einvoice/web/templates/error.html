@@ -1,0 +1,10 @@
+{% extends "auth/_bare.html" %}
+{% block title %}Something went wrong{% endblock %}
+{% block content %}
+<h1>Something went wrong</h1>
+<p class="muted">The app ran into an unexpected problem with that page. Nothing was half-saved: a page either
+  saves completely or not at all.</p>
+<p>Reference <strong>{{ ref }}</strong>. The details are in <code>data\logs\app.log</code>; send that file
+  (or the reference) to whoever maintains the app.</p>
+<p><a class="button" href="{{ url_for('index') }}">Back to the invoices</a></p>
+{% endblock %}

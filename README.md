@@ -258,6 +258,21 @@ changed or removed outside the app.
 **Backups:** a copy of the database is saved in `data\backups` once a day
 (the last 30 are kept), and **My account** downloads one on demand.
 
+## Reliability
+
+- **Backups off the laptop.** Each daily backup is checked (it must open and
+  pass SQLite's integrity check) and a second copy goes to a
+  "Micronet e-Invoice backups" folder in OneDrive, so a lost or broken laptop
+  doesn't take the books with it. `BACKUP_COPY_DIR` in `.env` chooses another
+  folder, or `off`.
+- **Checks at start.** The database, the journal and the history are checked
+  each time the app starts; any problem is shown at the top of every page.
+- **E-mail retries.** A send that fails because of the network or a busy mail
+  server is tried twice more (after 3 and 9 seconds). A wrong password or a
+  rejected address is reported at once.
+- **Error log.** An unexpected error shows a short message with a reference
+  code; the details go to `data\logs\app.log`.
+
 ## Settings (`.env`)
 
 | Setting | Meaning |
@@ -270,9 +285,10 @@ changed or removed outside the app.
 
 ## Back up
 
-Everything is in `data\einvoice.db`. The app keeps a daily copy in
-`data\backups` and **My account** downloads one; you can
-also copy the file while the app is closed.
+Everything is in `data\einvoice.db`. The app keeps a checked daily copy in
+`data\backups` and in OneDrive (see Reliability), and **My account** downloads
+one; you can also copy the file while the app is closed. To restore, close the
+app and put a backup file in place of `data\einvoice.db`.
 
 ## Development
 

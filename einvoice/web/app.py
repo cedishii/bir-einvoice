@@ -9,7 +9,9 @@ from itertools import zip_longest
 from flask import (Flask, Response, abort, flash, g, redirect, render_template,
                    request, send_file, url_for)
 
-from .. import backup, emailer, money
+from werkzeug.exceptions import HTTPException
+
+from .. import emailer, health, money
 from ..config import LOGO_PATH, Config, load_config
 from ..models import (DEFAULT_ITEM_NAME, DEFAULT_UNIT, MAX_LEN, SALE_TYPES, FormErrors,
                       invoice_from_form, today_ph)
@@ -59,10 +61,21 @@ def create_app(config: Config | None = None, transport: TransportSettings | None
     app.extensions["einvoice"] = {"repo": repo, "cfg": cfg}
     app.register_blueprint(books.bp)
     auth_views.install(app)  # sign-in, so the history shows who did what
-    try:
-        backup.daily(cfg())
-    except OSError:
-        pass  # a failed automatic backup must not stop the app
+
+    # Start-up checks (database, journal and history chains, today's backup);
+    # problems show at the top of every page. Errors go to data/logs/app.log.
+    health.setup_logging(cfg())
+    with app.app_context():
+        app.config["HEALTH"] = health.startup_checks(cfg(), repo().conn)
+
+    @app.errorhandler(Exception)
+    def unexpected_error(e):
+        if isinstance(e, HTTPException):
+            return e
+        ref = secrets.token_hex(3).upper()
+        app.logger.error("error %s on %s %s", ref, request.method, request.path, exc_info=e)
+        health.log.error("error %s on %s %s", ref, request.method, request.path, exc_info=e)
+        return render_template("error.html", ref=ref), 500
 
     @app.teardown_appcontext
     def close_db(_exc):

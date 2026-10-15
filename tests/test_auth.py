@@ -153,8 +153,9 @@ def test_backups(app, config, conn):
     r = c.get("/backup")
     assert r.status_code == 200 and r.data.startswith(b"SQLite format 3")
     assert audit_rows(conn, action="backup")
-    path = backup.daily(config)
-    assert path is not None and path.exists() and backup.daily(config) is None  # once a day
+    made = list((config.data_dir / "backups").glob("einvoice-*.db"))
+    assert len(made) == 1                    # made when the app started
+    assert backup.daily(config) is None      # once a day
 
 
 def test_history_filters(app, conn):

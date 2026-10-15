@@ -57,3 +57,10 @@ def sign_in(app, username="admin", password="Passw0rd-test"):
     r = client.post("/login", data={"username": username, "password": password})
     assert r.status_code == 302, r.get_data(as_text=True)
     return client
+
+
+@pytest.fixture(autouse=True)
+def no_retry_waits(monkeypatch):
+    """E-mail retries keep their order but don't wait in tests."""
+    from einvoice import emailer
+    monkeypatch.setattr(emailer, "RETRY_DELAYS", (0, 0))

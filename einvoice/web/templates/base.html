@@ -93,6 +93,7 @@
   {% endif %}
   </div>
   <main>
+    {% for problem in config.HEALTH %}<div class="flash error"><strong>Check needed:</strong> {{ problem }}</div>{% endfor %}
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% for category, message in messages %}
         <div class="flash {{ category }}">{{ message }}</div>
