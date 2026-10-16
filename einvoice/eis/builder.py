@@ -5,7 +5,8 @@ TransClass is the sale type picked on the invoice. Zero-rated rules (BIR sample
 JSON-02): VATAmt 0.00, TotNetItemSales = sum of NetSales, TotNetSalesAftDisct =
 same, NetAmtPay = same. VAT-exempt works the same way. VATable: amounts are net
 of VAT (UnitCost "Net of VAT"), VATAmt = 12% of the net total and NetAmtPay =
-net total + VATAmt.
+net total + VATAmt. Tax the client withholds (typed in PHP) goes in
+WithholdIncome and is taken off NetAmtPay; ForexAmt is the same amount in JPY.
 """
 from __future__ import annotations
 
@@ -80,7 +81,7 @@ def build(inv: Invoice, cfg: Config) -> dict:
         "OtherTaxRev": A(ZERO),
         "TotNetSalesAftDisct": A(total),
         "VATAmt": A(inv.vat_php),
-        "WithholdIncome": A(ZERO),
+        "WithholdIncome": A(inv.withholding_php),
         "WithholdBusVAT": A(ZERO),
         "WithholdBusPT": A(ZERO),
         "OtherNonTaxCharge": A(ZERO),

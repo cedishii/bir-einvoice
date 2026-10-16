@@ -48,14 +48,15 @@ class Repository:
                 """INSERT INTO invoices (control_no, issue_date, status, buyer_name,
                        buyer_tin, buyer_branch, buyer_address, business_style, rate,
                        rate_date, rate_source, total_jpy, total_php, eis_key, created_at,
-                       buyer_email, trans_class)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                       buyer_email, trans_class, withholding_php)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (invoice.control_no, invoice.issue_date.isoformat(), invoice.status,
                  invoice.buyer_name, invoice.buyer_tin, invoice.buyer_branch,
                  invoice.buyer_address, invoice.business_style, str(invoice.rate),
                  invoice.rate_date.isoformat(), invoice.rate_source,
                  str(invoice.total_jpy), str(invoice.total_php), invoice.eis_key,
-                 invoice.created_at, invoice.buyer_email, invoice.trans_class))
+                 invoice.created_at, invoice.buyer_email, invoice.trans_class,
+                 str(invoice.withholding_php)))
             invoice.id = cur.lastrowid
             for no, line in enumerate(invoice.lines, start=1):
                 conn.execute(
@@ -69,7 +70,9 @@ class Repository:
             ledger.audit(conn, "issue invoice",
                          f"{invoice.buyer_name}, {invoice.sale_type}, "
                          f"PHP {invoice.total_due_php:,.2f} (JPY {invoice.total_due_jpy:,.2f} "
-                         f"at {invoice.rate})", entity="invoice", entity_id=invoice.control_no)
+                         f"at {invoice.rate})"
+                         + (f", withholding tax PHP {invoice.withholding_php:,.2f}"
+                            if invoice.withholding_php else ""), entity="invoice", entity_id=invoice.control_no)
             postings.post_invoice(conn, invoice)  # Sales Journal
             conn.execute("COMMIT")
         except Exception:
@@ -159,6 +162,7 @@ def _invoice_from_rows(row: sqlite3.Row, line_rows: list[sqlite3.Row]) -> Invoic
         buyer_branch=row["buyer_branch"], buyer_address=row["buyer_address"],
         business_style=row["business_style"], buyer_email=row["buyer_email"],
         trans_class=row["trans_class"],
+        withholding_php=Decimal(row["withholding_php"]),
         rate=Decimal(row["rate"]),
         rate_date=date.fromisoformat(row["rate_date"]),
         rate_source=row["rate_source"], lines=lines,

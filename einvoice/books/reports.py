@@ -358,7 +358,8 @@ ENTITY_NAMES = {
     "invoice": "Invoice", "journal": "Journal entry", "collection": "Collection",
     "bill": "Bill", "payment": "Payment", "customer": "Client", "supplier": "Supplier",
     "account": "Account", "user": "User", "settings": "Setting", "report": "Report",
-    "database": "Database", "bir": "BIR",
+    "database": "Database", "bir": "BIR", "signature": "Signature",
+    "signed document": "Signed document",
 }
 
 

@@ -82,6 +82,15 @@
 </section>
 
 <section class="card">
+  <h2>BIR registration of this system (CAS)</h2>
+  <p><a class="button" href="{{ url_for('books.system_specifications') }}" target="_blank" data-sign
+        data-window-title="System and Technical Specifications">System and Technical Specifications (PDF)</a></p>
+  <p class="muted">Application and software, database, functions and data flows, controls, backup and disaster
+    recovery, the list of reports, and facsimiles of the invoices, books and reports printed from sample data.
+    Made fresh each time from the app itself. Sign it here, or print it unsigned to sign by hand.</p>
+</section>
+
+<section class="card">
   <h2>Year-end</h2>
   <form method="get" action="{{ url_for('books.archive') }}" class="filters">
     <label class="field"><span>Year</span>

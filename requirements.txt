@@ -5,3 +5,6 @@ pytest==9.1.1
 cryptography==50.0.2
 # Desktop app window (uses Microsoft Edge WebView2, part of Windows 11)
 pywebview==6.2.1
+# Signing PDFs: page previews and stamping the signature (einvoice/signing.py)
+pymupdf==1.28.2
+pillow==12.3.0

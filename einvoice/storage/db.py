@@ -348,6 +348,44 @@ MIGRATIONS = [
         updated_at  TEXT NOT NULL
     );
     """,
+    # 11: tax the client withholds, printed as "Less: Withholding Tax" and sent
+    # to BIR as WithholdIncome.
+    """
+    ALTER TABLE invoices ADD COLUMN withholding_php TEXT NOT NULL DEFAULT '0.00';
+    """,
+    # 12: signatures (a picture per user, earlier ones kept inactive) and the
+    # PDFs signed with them (see einvoice/signing.py). Neither is ever deleted;
+    # a signed document never changes.
+    """
+    CREATE TABLE signatures (
+        id          INTEGER PRIMARY KEY,
+        username    TEXT NOT NULL,
+        image       BLOB NOT NULL,
+        sha256      TEXT NOT NULL,
+        created_at  TEXT NOT NULL,
+        active      INTEGER NOT NULL DEFAULT 1
+    );
+    CREATE TABLE signed_documents (
+        id             INTEGER PRIMARY KEY,
+        title          TEXT NOT NULL,
+        source_path    TEXT NOT NULL,
+        source_sha256  TEXT NOT NULL,
+        pdf            BLOB NOT NULL,
+        sha256         TEXT NOT NULL,
+        placements     TEXT NOT NULL,
+        signature_id   INTEGER NOT NULL REFERENCES signatures(id),
+        signed_by      TEXT NOT NULL,
+        signed_at      TEXT NOT NULL
+    );
+    CREATE TRIGGER signatures_no_delete BEFORE DELETE ON signatures
+    BEGIN SELECT RAISE(ABORT, 'Records are never deleted; void or cancel instead.'); END;
+    CREATE TRIGGER signatures_image_final BEFORE UPDATE OF image, sha256, username ON signatures
+    BEGIN SELECT RAISE(ABORT, 'A saved signature can''t be changed; save a new one.'); END;
+    CREATE TRIGGER signed_documents_no_delete BEFORE DELETE ON signed_documents
+    BEGIN SELECT RAISE(ABORT, 'Records are never deleted; void or cancel instead.'); END;
+    CREATE TRIGGER signed_documents_final BEFORE UPDATE ON signed_documents
+    BEGIN SELECT RAISE(ABORT, 'A signed document can''t be changed.'); END;
+    """,
 ]
 
 

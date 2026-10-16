@@ -11,7 +11,7 @@
   <div class="actions">
     <a href="{{ url_for('books.taxes_page') }}">&larr; Tax returns</a>
     <a class="button secondary" href="{{ url_for('books.tax_form', code=form.code, format='csv', **args) }}">CSV</a>
-    <a class="button" href="{{ url_for('books.tax_form', code=form.code, format='pdf', **args) }}" target="_blank"
+    <a class="button" href="{{ url_for('books.tax_form', code=form.code, format='pdf', **args) }}" target="_blank" data-sign
        data-window-title="{{ form.code }} worksheet">PDF / print</a>
   </div>
 </div>

@@ -437,6 +437,9 @@ def _check_forcur(get: _Getter, issues: list[Issue]) -> None:
         # VAT is rounded separately in JPY and in PHP, and grows the
         # per-line rounding by 12%.
         tolerance = tolerance * (1 + VAT_RATE) + Decimal("0.005") * (rate + 1)
+    if any(get.num(k) for k in ("WithholdIncome", "WithholdBusVAT", "WithholdBusPT")):
+        # The withholding is typed in PHP and converted to JPY once, rounded.
+        tolerance += Decimal("0.005") * rate
     if abs(forex * rate - pay) > tolerance:
         issues.append(Issue("LOCAL-FX", "ForCur",
                             f"ForexAmt x ConvRate = {round2(forex * rate):.2f} PHP "

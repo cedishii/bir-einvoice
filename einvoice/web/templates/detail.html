@@ -11,7 +11,7 @@
 {% endif %}
 
 <div class="actions left">
-  <a class="button" href="{{ url_for('invoice_pdf', control_no=inv.control_no) }}" target="_blank" data-window-title="Service Invoice {{ inv.control_no }}">Open / print PDF</a>
+  <a class="button" href="{{ url_for('invoice_pdf', control_no=inv.control_no) }}" target="_blank" data-sign data-window-title="Service Invoice {{ inv.control_no }}">Open / print PDF</a>
   <a class="button secondary" href="{{ url_for('invoice_pdf', control_no=inv.control_no, download=1) }}">Download PDF</a>
 </div>
 

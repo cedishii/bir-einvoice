@@ -185,12 +185,18 @@ def _summary(inv: Invoice):
         left_rows = [
             [_p("NET OF VAT (JPY)", S_LABEL), _p(_money(inv.total_jpy), S_RIGHT)],
             [_p("ADD: 12% VAT (JPY)", S_LABEL), _p(_money(inv.vat_jpy), S_RIGHT)],
-            [_p("TOTAL DUE (JPY)", S_LABEL), _p(_money(inv.total_due_jpy), S_RIGHT_B)],
+            [_p("TOTAL SALES (JPY)" if inv.withholding_php else "TOTAL DUE (JPY)", S_LABEL),
+             _p(_money(inv.gross_jpy), S_RIGHT_B)],
         ]
     else:
         left_rows = [[_p("TOTAL AMOUNT (JPY)", S_LABEL), _p(_money(inv.total_jpy), S_RIGHT_B)]]
+    if inv.withholding_php:
+        left_rows += [
+            [_p("LESS: WITHHOLDING TAX (JPY)", S_LABEL), _p(_money(inv.withholding_jpy), S_RIGHT)],
+            [_p("TOTAL AMOUNT DUE (JPY)", S_LABEL), _p(_money(inv.total_due_jpy), S_RIGHT_B)],
+        ]
     left_rows.append([_p("PHP EQUIVALENT", S_LABEL), _p(_money(inv.total_due_php), S_RIGHT_B)])
-    left = Table(left_rows, colWidths=[1.75 * inch, 1.75 * inch])
+    left = Table(left_rows, colWidths=[2.0 * inch, 1.5 * inch])
     left.setStyle(TableStyle([
         ("BOX", (0, 0), (-1, -1), 0.8, LINE),
         ("LINEBELOW", (0, 0), (-1, -2), 0.3, colors.HexColor("#cccccc")),
@@ -203,30 +209,52 @@ def _summary(inv: Invoice):
         _p(f"(PHP equivalent: {amount_in_words(inv.total_due_php, 'PESOS')})", S_SMALL),
     ]
 
-    # Right: the BIR sales summary box, as on the paper receipt. The sales go
-    # in the row of the invoice's sale type, which is highlighted.
+    # Right: the amount box in the BIR invoice format (with "Less: Withholding
+    # Tax"), then the sales summary. The sales go in the row of the invoice's
+    # sale type, which is highlighted. All PHP.
     net = inv.total_php
     kinds = [(VATABLE, "VATable Sales"), (VAT_EXEMPT, "VAT-Exempt Sales"),
              (ZERO_RATED, "Zero-Rated Sales")]
-    box = [[label, net if code == inv.trans_class else ZERO] for code, label in kinds] + [
-        ["Total Sales", net],
-        ["VAT Amount (12%)", inv.vat_php],
-        ["Less: Withholding Tax", ZERO],
-        ["TOTAL AMOUNT DUE (PHP)", inv.total_due_php],
-    ]
-    right_rows = [[_p(k, S_BODY), _p(_money(v), S_RIGHT)] for k, v in box]
-    hl = [code for code, _ in kinds].index(inv.trans_class)
-    right_rows[hl] = [_p(kinds[hl][1], _style("hl", 9, bold=True, color=RED)),
+    bold = _style("rb", 9, bold=True)
+    right_rows = [[_p("PARTICULARS", S_HEAD), _p("AMOUNT (PHP)", S_HEAD_R)]]
+    right_rows += [[_p(k, S_BODY), _p(_money(v), S_RIGHT)] for k, v in [
+        ("Total Sales (VAT Inclusive)", inv.gross_php),
+        ("Less: VAT", inv.vat_php),
+        ("Amount net of VAT", net),
+        ("Less: Withholding Tax", inv.withholding_php),
+        ("Amount Due", inv.amount_due_php),
+        ("Add: VAT", inv.vat_php),
+    ]]
+    due = len(right_rows)
+    right_rows.append([_p("TOTAL AMOUNT DUE", bold), _p("PHP " + _money(inv.total_due_php), S_RIGHT_B)])
+    gap = len(right_rows)
+    right_rows.append(["", ""])
+    first = len(right_rows)
+    right_rows += [[_p(label, S_BODY), _p(_money(net if code == inv.trans_class else ZERO), S_RIGHT)]
+                   for code, label in kinds]
+    hl = first + [code for code, _ in kinds].index(inv.trans_class)
+    right_rows[hl] = [_p(kinds[hl - first][1], _style("hl", 9, bold=True, color=RED)),
                       _p(_money(net), _style("hlv", 9, bold=True, align=TA_RIGHT, color=RED))]
-    right_rows[-1] = [_p("TOTAL AMOUNT DUE (PHP)", _style("tad", 9, bold=True)),
-                      _p(_money(inv.total_due_php), S_RIGHT_B)]
+    right_rows += [[_p("VAT Amount", S_BODY), _p(_money(inv.vat_php), S_RIGHT)],
+                   [_p("TOTAL SALES", bold), _p("PHP " + _money(inv.gross_php), S_RIGHT_B)]]
+    grey = colors.HexColor("#cccccc")
     right = Table(right_rows, colWidths=[1.85 * inch, 1.45 * inch])
     right.setStyle(TableStyle([
-        ("BOX", (0, 0), (-1, -1), 0.8, LINE),
-        ("LINEBELOW", (0, 0), (-1, -2), 0.3, colors.HexColor("#cccccc")),
+        ("BOX", (0, 0), (-1, gap - 1), 0.8, LINE),
+        ("BOX", (0, first), (-1, -1), 0.8, LINE),
+        ("LINEBELOW", (0, 0), (-1, gap - 2), 0.3, grey),
+        ("LINEBELOW", (0, first), (-1, -2), 0.3, grey),
+        ("BACKGROUND", (0, 0), (-1, 0), SHADE),
+        ("LINEBELOW", (0, 0), (-1, 0), 0.8, LINE),
+        ("LINEABOVE", (0, due), (-1, due), 0.8, LINE),
+        ("BACKGROUND", (0, due), (-1, due), SHADE),
         ("BACKGROUND", (0, hl), (-1, hl), ZR_FILL),
         ("LINEABOVE", (0, -1), (-1, -1), 0.8, LINE),
         ("BACKGROUND", (0, -1), (-1, -1), SHADE),
+        ("TOPPADDING", (0, 0), (-1, -1), 2.5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
+        ("TOPPADDING", (0, gap), (-1, gap), 0),
+        ("BOTTOMPADDING", (0, gap), (-1, gap), 0),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
     ]))
 

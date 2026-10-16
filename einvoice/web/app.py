@@ -28,12 +28,12 @@ from ..pdf.service_invoice import render as render_pdf
 from ..storage.db import connect
 from ..storage import drafts
 from ..storage.repository import Repository
-from . import auth_views, books
+from . import auth_views, books, signing_views
 
 LINE_FIELDS = ["item_name", "description", "qty", "unit", "unit_cost_jpy", "amount_jpy"]
 FORM_FIELDS = ["issue_date", "buyer_name", "buyer_tin", "buyer_address",
-               "business_style", "buyer_email", "trans_class", "rate", "rate_date",
-               "rate_source"]
+               "business_style", "buyer_email", "trans_class", "withholding_php", "rate",
+               "rate_date", "rate_source"]
 DEFAULT_LINES = 2
 
 
@@ -60,6 +60,7 @@ def create_app(config: Config | None = None, transport: TransportSettings | None
 
     app.extensions["einvoice"] = {"repo": repo, "cfg": cfg}
     app.register_blueprint(books.bp)
+    app.register_blueprint(signing_views.bp)
     auth_views.install(app)  # sign-in, so the history shows who did what
 
     # Start-up checks (database, journal and history chains, today's backup);

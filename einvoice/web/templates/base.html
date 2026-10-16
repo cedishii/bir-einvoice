@@ -67,6 +67,9 @@
       <a href="{{ url_for('books.report', key='audit') }}" title="History: what everyone did"
          class="{{ 'active' if ep == 'books.report' and request.view_args.get('key') == 'audit' }}">
         <span class="icon">&#128269;</span><span class="label">History</span></a>
+      <a href="{{ url_for('signing.signatures') }}" title="Signatures and signed PDFs"
+         class="{{ 'active' if ep.startswith('signing.') }}">
+        <span class="icon">&#9997;</span><span class="label">Signatures</span></a>
     </nav>
     <div class="sidebar-foot label">
       {% if me %}
@@ -182,18 +185,63 @@
   if (history.length > 1) document.getElementById("back-btn").hidden = false;
 </script>
 
+{% if me %}
+<dialog id="sign-ask" class="sign-ask">
+  <h2>Sign this PDF?</h2>
+  <p><strong data-doc></strong></p>
+  <p class="muted">Put your saved signature on it, or open it as it is to print and sign by hand
+    (or have it notarized).</p>
+  <div class="actions">
+    <button type="button" class="link" data-cancel>Cancel</button>
+    <button type="button" class="button secondary" data-plain>Open without signature</button>
+    <button type="button" class="button" data-signit>Sign it</button>
+  </div>
+</dialog>
+{% endif %}
+
 <script>
   // In the desktop app window (einvoice/desktop.py), links meant for a new tab,
   // like the invoice PDF, open in their own window instead of replacing this page.
   document.addEventListener("click", (e) => {
     const a = e.target.closest("a[target=_blank]");
-    if (!a || !(window.pywebview && window.pywebview.api && window.pywebview.api.open_window)) return;
+    if (!a || a.hasAttribute("data-sign")) return;
+    if (!(window.pywebview && window.pywebview.api && window.pywebview.api.open_window)) return;
     e.preventDefault();
     window.pywebview.api.open_window(a.href, a.dataset.windowTitle || a.textContent.trim());
   });
+
+  // PDFs that can be signed (data-sign) ask first: open as it is (for a wet
+  // signature or notarization), or put the user's saved signature on it.
+  (() => {
+    const dlg = document.getElementById("sign-ask");
+    if (!dlg) return;
+    let link = null;
+    document.addEventListener("click", (e) => {
+      const a = e.target.closest("a[data-sign]");
+      if (!a || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      e.preventDefault();
+      link = a;
+      dlg.querySelector("[data-doc]").textContent = a.dataset.windowTitle || a.textContent.trim();
+      dlg.showModal();
+    });
+    dlg.querySelector("[data-plain]").addEventListener("click", () => {
+      dlg.close();
+      const title = link.dataset.windowTitle || link.textContent.trim();
+      if (window.pywebview && window.pywebview.api && window.pywebview.api.open_window)
+        window.pywebview.api.open_window(link.href, title);
+      else window.open(link.href, "_blank");
+    });
+    dlg.querySelector("[data-signit]").addEventListener("click", () => {
+      const u = new URL(link.href, location.href);
+      const q = new URLSearchParams({src: u.pathname + u.search,
+                                     title: link.dataset.windowTitle || ""});
+      location.href = "{{ url_for('signing.sign_page') }}?" + q;
+    });
+    dlg.querySelector("[data-cancel]").addEventListener("click", () => dlg.close());
+  })();
 </script>
 
-{% if me and ep not in ('new_invoice', 'review_invoice', 'show_review', 'issue_invoice') %}
+{% if me and ep not in ('new_invoice', 'review_invoice', 'show_review', 'issue_invoice', 'signing.place') %}
 <a class="fab" href="{{ url_for('new_invoice') }}" title="New invoice">
   <span>+</span> New invoice
 </a>

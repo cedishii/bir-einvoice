@@ -46,14 +46,27 @@
   </tfoot>
 </table>
 
+{# The amount box in the BIR invoice format, in PHP. #}
 <table class="sales-box">
+  <thead><tr><th>Particulars</th><th class="num">Amount (PHP)</th></tr></thead>
+  <tbody>
+  <tr><td>Total Sales (VAT Inclusive)</td><td class="num">{{ fmt(inv.gross_php) }}</td></tr>
+  <tr><td>Less: VAT</td><td class="num">{{ fmt(inv.vat_php) }}</td></tr>
+  <tr><td>Amount net of VAT</td><td class="num">{{ fmt(inv.total_php) }}</td></tr>
+  <tr class="{{ 'wht' if inv.withholding_php }}"><td>Less: Withholding Tax</td>
+      <td class="num">{{ fmt(inv.withholding_php) }}</td></tr>
+  <tr><td>Amount Due</td><td class="num">{{ fmt(inv.amount_due_php) }}</td></tr>
+  <tr><td>Add: VAT</td><td class="num">{{ fmt(inv.vat_php) }}</td></tr>
+  <tr class="total"><td>Total Amount Due</td><td class="num">&#8369; {{ fmt(inv.total_due_php) }}</td></tr>
+  {% if inv.total_due_jpy != inv.total_jpy %}
+  <tr><td>Total Amount Due (JPY)</td><td class="num">JPY {{ fmt(inv.total_due_jpy) }}</td></tr>
+  {% endif %}
+  <tr class="gap"><td colspan="2"></td></tr>
   {% for code, label in [("01", "VATable Sales"), ("03", "VAT-Exempt Sales"), ("02", "Zero-Rated Sales")] %}
   <tr class="{{ 'zr' if inv.trans_class == code }}"><td>{{ label }}</td>
       <td class="num">{{ fmt(inv.total_php) if inv.trans_class == code else "0.00" }}</td></tr>
   {% endfor %}
-  <tr><td>VAT Amount (12%)</td><td class="num">{{ fmt(inv.vat_php) }}</td></tr>
-  {% if inv.is_vatable %}
-  <tr><td>Total Amount Due (JPY)</td><td class="num">{{ fmt(inv.total_due_jpy) }}</td></tr>
-  {% endif %}
-  <tr class="total"><td>Total Amount Due (PHP)</td><td class="num">{{ fmt(inv.total_due_php) }}</td></tr>
+  <tr><td>VAT Amount</td><td class="num">{{ fmt(inv.vat_php) }}</td></tr>
+  <tr class="total"><td>TOTAL SALES</td><td class="num">&#8369; {{ fmt(inv.gross_php) }}</td></tr>
+  </tbody>
 </table>

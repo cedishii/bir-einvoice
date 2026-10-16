@@ -11,7 +11,7 @@
   <div class="actions">
     <a href="{{ url_for('books.overview') }}">&larr; Books</a>
     <a class="button secondary" href="{{ url_for('books.report', key=key, format='csv', **args) }}">CSV</a>
-    <a class="button" href="{{ url_for('books.report', key=key, format='pdf', **args) }}" target="_blank"
+    <a class="button" href="{{ url_for('books.report', key=key, format='pdf', **args) }}" target="_blank" data-sign
        data-window-title="{{ r.title }}">PDF / print</a>
   </div>
 </div>

@@ -41,6 +41,11 @@
           to clients abroad) and VAT-exempt have no VAT.</small>
       </label>
     </div>
+    <div class="row">
+      {{ field("withholding_php", "Withholding tax (PHP)", required=False,
+               hint="Tax the client withholds from its payment (it gives Micronet a Form 2307), e.g. 2% of the amount net of VAT. Leave blank if none, as for clients abroad.",
+               attrs='inputmode="decimal" placeholder="0.00" autocomplete="off"') }}
+    </div>
   </fieldset>
 
   <fieldset>

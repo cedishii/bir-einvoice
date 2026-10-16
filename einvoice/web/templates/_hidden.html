@@ -1,6 +1,7 @@
 {# Carries the entered form values from the review page back to edit / issue. #}
 {% for key in ["issue_date", "buyer_name", "buyer_tin", "buyer_address",
-               "business_style", "buyer_email", "trans_class", "rate", "rate_date", "rate_source"] %}
+               "business_style", "buyer_email", "trans_class", "withholding_php", "rate", "rate_date",
+               "rate_source"] %}
 <input type="hidden" name="{{ key }}" value="{{ data[key] }}">
 {% endfor %}
 {% for row in rows %}

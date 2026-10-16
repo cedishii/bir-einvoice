@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}Signatures{% endblock %}
+{% block content %}
+<div class="heading">
+  <h1>Signatures</h1>
+  <p class="muted">Save your signature once. When you open a PDF from the app, you are asked whether to sign it:
+    say no to print it for a wet signature or notarization, or yes to drag your signature onto it.</p>
+</div>
+
+<section class="card">
+  <h2>My signature</h2>
+  {% if mine %}
+  <div class="sig-current">
+    <img src="{{ url_for('signing.my_signature_png') }}?v={{ mine.id }}" alt="Your saved signature">
+  </div>
+  <p class="muted">Saved {{ mine.created_at.replace("T", " ")[:16] }}. Only you can use it; every use is in the History.</p>
+  <form method="post" action="{{ url_for('signing.remove_signature') }}"
+        onsubmit="return confirm('Remove your signature? PDFs already signed keep it.')">
+    <button class="link" type="submit">Remove my signature</button>
+  </form>
+  {% else %}
+  <p class="muted">You have no saved signature yet.</p>
+  {% endif %}
+</section>
+
+<form method="post" action="{{ url_for('signing.save_signature') }}" enctype="multipart/form-data"
+      class="card" id="sig-form">
+  <h2>{{ "Replace my signature" if mine else "Add my signature" }}</h2>
+  <input type="hidden" name="next" value="{{ next }}">
+  <input type="hidden" name="drawing" id="drawing">
+  <div class="sig-tabs">
+    <label><input type="radio" name="how" value="draw" checked> Draw it</label>
+    <label><input type="radio" name="how" value="upload"> Use a picture</label>
+  </div>
+
+  <div id="draw-box">
+    <canvas id="pad" class="sig-pad" width="900" height="300" aria-label="Signature pad"></canvas>
+    <div class="sig-pad-foot">
+      <small class="muted">Sign with the mouse, a touchpad or a pen.</small>
+      <button type="button" class="link" id="clear">Clear</button>
+    </div>
+  </div>
+
+  <div id="upload-box" hidden>
+    <label class="field">
+      <span>Picture of your signature (PNG or JPG)</span>
+      <input type="file" name="picture" accept="image/png,image/jpeg">
+      <small>Sign in dark ink on plain white paper, then take a photo or scan it. The white paper
+        becomes see-through and the picture is cropped to the signature.</small>
+    </label>
+  </div>
+
+  <div class="actions">
+    {% if next %}<a href="{{ next }}">Cancel</a>{% endif %}
+    <button class="button" type="submit">Save signature</button>
+  </div>
+</form>
+
+<section class="card">
+  <h2>Signed documents</h2>
+  {% if docs %}
+  <table class="grid compact">
+    <thead><tr><th>#</th><th>Document</th><th>Signed by</th><th>When</th><th></th></tr></thead>
+    <tbody>
+    {% for d in docs %}
+      <tr><td>{{ d.id }}</td><td><a href="{{ url_for('signing.signed', doc_id=d.id) }}">{{ d.title }}</a></td>
+        <td>{{ d.signed_by }}</td><td>{{ d.signed_at.replace("T", " ")[:16] }}</td>
+        <td><a href="{{ url_for('signing.signed_pdf', doc_id=d.id) }}" target="_blank"
+               data-window-title="{{ d.title }} (signed)">PDF</a></td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">None yet.</p>
+  {% endif %}
+</section>
+
+<script>
+  const pad = document.getElementById("pad"), ctx = pad.getContext("2d");
+  let drawing = false, drawn = false, last = null;
+  ctx.lineWidth = 4; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.strokeStyle = "#10204a";
+  const at = (e) => {
+    const r = pad.getBoundingClientRect();
+    return [(e.clientX - r.left) * pad.width / r.width, (e.clientY - r.top) * pad.height / r.height];
+  };
+  pad.addEventListener("pointerdown", (e) => {
+    drawing = true; last = at(e); pad.setPointerCapture(e.pointerId);
+    ctx.beginPath(); ctx.arc(last[0], last[1], 1.5, 0, 7); ctx.fillStyle = ctx.strokeStyle; ctx.fill();
+    drawn = true;
+  });
+  pad.addEventListener("pointermove", (e) => {
+    if (!drawing) return;
+    const p = at(e);
+    ctx.beginPath(); ctx.moveTo(last[0], last[1]); ctx.lineTo(p[0], p[1]); ctx.stroke();
+    last = p;
+  });
+  ["pointerup", "pointercancel"].forEach(t => pad.addEventListener(t, () => drawing = false));
+  document.getElementById("clear").addEventListener("click", () => {
+    ctx.clearRect(0, 0, pad.width, pad.height); drawn = false;
+  });
+
+  const form = document.getElementById("sig-form");
+  form.querySelectorAll('[name="how"]').forEach(r => r.addEventListener("change", () => {
+    const upload = form.how.value === "upload";
+    document.getElementById("draw-box").hidden = upload;
+    document.getElementById("upload-box").hidden = !upload;
+  }));
+  form.addEventListener("submit", (e) => {
+    if (form.how.value === "draw") {
+      if (!drawn) { e.preventDefault(); alert("Draw your signature first."); return; }
+      form.picture.value = "";
+      document.getElementById("drawing").value = pad.toDataURL("image/png");
+    } else if (!form.picture.value) {
+      e.preventDefault(); alert("Choose a picture of your signature.");
+    }
+  });
+</script>
+{% endblock %}

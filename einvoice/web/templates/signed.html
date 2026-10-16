@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Signed: {{ doc.title }}{% endblock %}
+{% block content %}
+<div class="heading">
+  <h1>Signed: {{ doc.title }}</h1>
+  <p class="muted">Signed by {{ doc.signed_by }} on {{ doc.signed_at.replace("T", " ")[:16] }}.
+    The signed copy is kept in the app (Signatures page) and recorded in the History.</p>
+</div>
+
+<div class="actions left">
+  <a class="button" href="{{ url_for('signing.signed_pdf', doc_id=doc.id) }}" target="_blank"
+     data-window-title="{{ doc.title }} (signed)">Open / print signed PDF</a>
+  <a class="button secondary" href="{{ url_for('signing.signed_pdf', doc_id=doc.id, download=1) }}">Download signed PDF</a>
+  <a href="{{ doc.source_path }}" target="_blank" data-window-title="{{ doc.title }}">Unsigned PDF</a>
+</div>
+
+<section class="card">
+  <p>Signed copy no. <strong>{{ doc.id }}</strong> · fingerprint (SHA-256) <code class="hash">{{ doc.sha256 }}</code></p>
+  <p class="muted">This is a visible signature, the same as "Fill &amp; Sign" in a PDF reader. It is not a
+    certificate-based digital signature. Documents that must be notarized should be printed unsigned and signed
+    in front of the notary.</p>
+</section>
+{% endblock %}

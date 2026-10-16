@@ -362,3 +362,27 @@ pushed.
 - Tax worksheets: revenue = "Revenue" section, tax_exclude accounts left out.
 - Not built: inventory (the chart has no inventory accounts; Micronet sells
   services).
+
+## 11. Withholding tax, signatures, CAS specifications (BUILT 2026-10-16)
+
+New BIR mandate: invoices show "Less: Withholding Tax". Micronet sent the
+order of the amount box (Total Sales VAT Inclusive ... Total Amount Due, then
+VATable / Exempt / Zero-Rated Sales, VAT Amount, TOTAL SALES).
+- Withholding is typed in PHP (user's choice), migration 11. EIS:
+  `WithholdIncome`; `NetAmtPay` and `ForexAmt` are net of it (JPY = PHP / rate,
+  rounded). `WithholdBusVAT` / `WithholdBusPT` stay 0 (government payors /
+  non-VAT only). The Sales Journal keeps AR at the gross amount; the CWT is
+  booked at collection (the form pre-fills it from the invoice).
+
+Micronet asked for the CAS application's System and Technical Specifications.
+No file format is prescribed (RMO 9-2021 lists the contents); the user chose
+PDF, with signing optional: ask first, then either the plain PDF (wet
+signature / notarization) or a signature placed in the app.
+- `einvoice/signing.py` (migration 12: signatures, signed_documents; no
+  deletes, signed copies never change). Any app PDF is signed by its address:
+  the PDF is made again in an inner request with the user's cookie, kept in
+  memory while the user places the signature, stamped with PyMuPDF, stored,
+  audited. PyMuPDF and Pillow moved to requirements.txt.
+- `einvoice/books/specs.py`: the document, from live facts (versions, tables,
+  triggers, schema version) plus facsimiles printed from a temporary sample
+  database (the company's chart is copied in when present; records never are).

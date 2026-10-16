@@ -130,7 +130,9 @@ def post_invoice(conn: sqlite3.Connection, inv: Invoice, *, check_period: bool =
         address=inv.buyer_address, business_style=inv.business_style, email=inv.buyer_email)
     conn.execute("UPDATE invoices SET customer_id = ? WHERE id = ?", (cid, inv.id))
     lines = [
-        Line(ledger.account_for(conn, "ar"), debit=inv.total_due_php),
+        # The client owes the full amount; what it withholds is settled with
+        # its Form 2307 when the invoice is collected (Creditable Withholding Tax).
+        Line(ledger.account_for(conn, "ar"), debit=inv.gross_php),
         Line(ledger.account_for(conn, "sales"), credit=inv.total_php, memo=inv.sale_type),
     ]
     if inv.vat_php:

@@ -118,7 +118,7 @@ def test_wrong_vat_amount_caught(repo, config, monkeypatch):
 
 def test_vatable_pdf(repo, config):
     text = _text(render(repo.issue(make_invoice(trans_class="01")), config))
-    for expected in ["VATABLE SALE", "VAT Amount (12%)", "547,200.00", "5,107,200.00",
+    for expected in ["VATABLE SALE", "VAT Amount", "547,200.00", "5,107,200.00",
                      "ADD: 12% VAT (JPY)", "1,440,000.00", "13,440,000.00",
                      "THIRTEEN MILLION FOUR HUNDRED FORTY THOUSAND YEN ONLY"]:
         assert expected in text, expected

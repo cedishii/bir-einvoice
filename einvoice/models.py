@@ -99,6 +99,7 @@ class Invoice:
     lines: list[InvoiceLine]
     buyer_email: str = ""     # where the invoice PDF is e-mailed; BuyerInfo.Email
     trans_class: str = ZERO_RATED  # sale type, a SALE_TYPES key; EIS TransClass
+    withholding_php: Decimal = money.ZERO  # tax the client withholds; EIS WithholdIncome
     control_no: str = ""      # assigned when the invoice is issued
     status: str = "draft"     # draft / issued / void
     eis_key: str = ""         # last 8 chars of the EisUniqueId, fixed at issue
@@ -149,13 +150,38 @@ class Invoice:
     def vat_jpy(self) -> Decimal:
         return money.vat_of(self.total_jpy) if self.is_vatable else money.ZERO
 
+    # The invoice's amount box (BIR format):
+    #   Total Sales (VAT inclusive)    gross = net + VAT
+    #   Less: VAT -> Amount net of VAT net
+    #   Less: Withholding Tax          typed in PHP
+    #   Amount Due                     net - withholding
+    #   Add: VAT -> Total Amount Due   net - withholding + VAT (what the client pays)
     @property
-    def total_due_php(self) -> Decimal:
+    def gross_php(self) -> Decimal:
         return self.total_php + self.vat_php
 
     @property
-    def total_due_jpy(self) -> Decimal:
+    def gross_jpy(self) -> Decimal:
         return self.total_jpy + self.vat_jpy
+
+    @property
+    def withholding_jpy(self) -> Decimal:
+        """The withholding in JPY at the invoice's rate (it is typed in PHP)."""
+        if not self.withholding_php:
+            return money.ZERO
+        return money.round2(self.withholding_php / self.rate)
+
+    @property
+    def amount_due_php(self) -> Decimal:
+        return self.total_php - self.withholding_php
+
+    @property
+    def total_due_php(self) -> Decimal:
+        return self.gross_php - self.withholding_php
+
+    @property
+    def total_due_jpy(self) -> Decimal:
+        return self.gross_jpy - self.withholding_jpy
 
     @property
     def has_tin(self) -> bool:
@@ -253,6 +279,17 @@ def invoice_from_form(form: dict) -> Invoice:
     except money.MoneyError as e:
         errors["rate"] = str(e)
 
+    withholding = money.ZERO
+    if str(form.get("withholding_php", "")).strip():
+        try:
+            withholding = money.parse_decimal(
+                form.get("withholding_php"), field="Withholding tax (PHP)",
+                max_decimals=money.AMOUNT_MAX_DECIMALS, positive=False)
+            if withholding < 0:
+                errors["withholding_php"] = "Withholding tax (PHP) can't be negative."
+        except money.MoneyError as e:
+            errors["withholding_php"] = str(e)
+
     lines: list[InvoiceLine] = []
     columns = ["item_name", "description", "qty", "unit", "unit_cost_jpy", "amount_jpy"]
     rows = zip_longest(*(form.get(c + "[]", []) for c in columns), fillvalue="")
@@ -309,10 +346,14 @@ def invoice_from_form(form: dict) -> Invoice:
     if errors:
         raise FormErrors(errors)
 
-    return Invoice(
+    invoice = Invoice(
         issue_date=issue_date, buyer_name=buyer_name, buyer_tin=buyer_tin,
         buyer_branch=buyer_branch, buyer_address=buyer_address,
         business_style=business_style, buyer_email=buyer_email, trans_class=trans_class,
-        rate=rate, rate_date=rate_date,
+        withholding_php=money.round2(withholding), rate=rate, rate_date=rate_date,
         rate_source=rate_source, lines=lines,
     ).compute()
+    if withholding >= invoice.total_php:
+        raise FormErrors({"withholding_php": "Withholding tax (PHP) must be less than the "
+                          f"amount net of VAT (PHP {money.fmt(invoice.total_php)})."})
+    return invoice

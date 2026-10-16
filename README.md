@@ -128,6 +128,14 @@ Some protocol details are marked *unconfirmed* on the BIR page. See
   (0%)** or **VAT-Exempt**. Prices are entered net of VAT; for VATable sales 12%
   VAT is added on top of the total (in JPY for the client, in PHP for BIR).
   Zero-rated and exempt invoices have VAT 0.00.
+- **Withholding tax** (optional, typed in PHP): tax the client withholds and
+  covers with a Form 2307. The amount box follows BIR's invoice format: Total
+  Sales (VAT Inclusive), Less: VAT, Amount net of VAT, Less: Withholding Tax,
+  Amount Due, Add: VAT, Total Amount Due; then VATable / VAT-Exempt /
+  Zero-Rated Sales, VAT Amount, TOTAL SALES. BIR gets it as `WithholdIncome`,
+  and `NetAmtPay` is net of it. The JPY figure is PHP / rate. The books still
+  record the full receivable; the 2307 settles the rest when the collection is
+  recorded (the collection form fills it in).
 
 ## Books of accounts
 
@@ -258,6 +266,34 @@ changed or removed outside the app.
 **Backups:** a copy of the database is saved in `data\backups` once a day
 (the last 30 are kept), and **My account** downloads one on demand.
 
+## Signatures
+
+Each user can save a signature on the **Signatures** page: draw it with the
+mouse or a pen, or upload a photo or scan of one signed on white paper (the
+paper becomes see-through). Clicking any PDF button (invoices, books, reports,
+tax worksheets, the system specifications) then asks first:
+
+- **Open without signature**: the PDF as always, to sign by hand or notarize.
+- **Sign it**: the pages appear; click where the signature goes, drag it,
+  resize it, and optionally print your name and the date under it. The signed
+  copy is kept in the app (listed on the Signatures page) with its SHA-256
+  fingerprint, and the signing is in the History.
+
+Only the owner can use a signature. Replacing one keeps the old picture on
+file. This is a visible signature (like "Fill & Sign" in a PDF reader), not a
+certificate-based digital signature.
+
+## BIR registration document
+
+**Books & reports > System and Technical Specifications (PDF)** prints the
+document for the CAS application: application and software (with the
+versions in use), the database and its tables, functions, data-flow diagrams,
+automatic postings, controls and security, backup and disaster recovery, the
+list of reports, a certification page, and annexes with facsimiles of the
+invoices, books, reports and audit trail. The facsimiles are printed by the
+app from a throwaway database of sample transactions, so no company records
+appear in it. It is made fresh each time, so it stays true to the app.
+
 ## Reliability
 
 - **Backups off the laptop.** Each daily backup is checked (it must open and
@@ -305,3 +341,5 @@ app and put a backup file in place of `data\einvoice.db`.
 - `tools/prepare_logo.py`: renders `assets/logo.png` from the company's logo PDF
 - `tools/create_shortcut.py`: desktop / Start menu shortcut (run via `Create desktop shortcut.bat`)
 - `einvoice/desktop.py`: the desktop-window mode
+- `einvoice/signing.py`, `einvoice/web/signing_views.py`: signatures on PDFs
+- `einvoice/books/specs.py`: the System and Technical Specifications PDF

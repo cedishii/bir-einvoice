@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}Sign {{ item.title }}{% endblock %}
+{% block content %}
+<div class="heading">
+  <h1>Sign: {{ item.title }}</h1>
+  <p class="muted">Click on the page where your signature goes. Drag it to move it, drag its corner to make it
+    bigger or smaller, &times; to take it off. You can sign more than one page.</p>
+</div>
+
+{% if not mine %}
+<div class="flash error">
+  You have no saved signature yet.
+  <a href="{{ url_for('signing.signatures', next=url_for('signing.place', token=token)) }}">Add your signature</a>,
+  then you come back here.
+</div>
+{% endif %}
+
+<form method="post" action="{{ url_for('signing.apply', token=token) }}" id="sign-form" class="sign-bar card">
+  <input type="hidden" name="placements" id="placements">
+  <label class="check"><input type="checkbox" name="caption" value="1" id="caption" checked>
+    Print my name and today's date under the signature</label>
+  <div class="actions">
+    <a href="javascript:history.back()">Cancel</a>
+    <button class="button" type="submit" id="sign-btn" disabled>Sign and save PDF</button>
+  </div>
+</form>
+
+<div class="sheets">
+{% for w, h in sizes %}
+  <div class="sheet-wrap">
+    <div class="sheet" data-page="{{ loop.index0 }}" data-wpt="{{ w }}" style="aspect-ratio: {{ w }} / {{ h }}">
+      <img src="{{ url_for('signing.page_png', token=token, page=loop.index0) }}" alt="Page {{ loop.index }}"
+           draggable="false" loading="lazy">
+    </div>
+    <div class="muted sheet-no">Page {{ loop.index }} of {{ sizes | length }}</div>
+  </div>
+{% endfor %}
+</div>
+
+{% if mine %}
+<template id="sig-tpl">
+  <div class="sig-box">
+    <img src="{{ url_for('signing.my_signature_png') }}?v={{ mine.id }}" alt="Your signature" draggable="false">
+    <div class="sig-caption">{% for line in caption %}<div>{{ line }}</div>{% endfor %}</div>
+    <button type="button" class="sig-x" title="Take it off">&times;</button>
+    <span class="sig-resize" title="Drag to resize"></span>
+  </div>
+</template>
+<script>
+(() => {
+  const tpl = document.getElementById("sig-tpl");
+  const boxes = [];
+  let aspect = 0.35;
+  const probe = new Image();
+  probe.onload = () => { aspect = probe.naturalHeight / probe.naturalWidth || aspect; };
+  probe.src = tpl.content.querySelector("img").src;
+
+  const btn = document.getElementById("sign-btn");
+  const captionOn = document.getElementById("caption");
+  const refresh = () => {
+    btn.disabled = boxes.length === 0;
+    document.querySelectorAll(".sig-caption").forEach(c => c.hidden = !captionOn.checked);
+  };
+  captionOn.addEventListener("change", refresh);
+
+  // Caption text at the size it will print (7.5 pt on the page).
+  const fitCaption = (box) => {
+    const sheet = box.parentElement;
+    box.querySelector(".sig-caption").style.fontSize =
+      (7.5 * sheet.clientWidth / parseFloat(sheet.dataset.wpt)) + "px";
+  };
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+  function add(sheet, cx, cy) {
+    const box = tpl.content.firstElementChild.cloneNode(true);
+    const W = sheet.clientWidth, H = sheet.clientHeight;
+    const landscape = W > H;
+    const w = W * (landscape ? 0.16 : 0.24);
+    box.style.width = w + "px";
+    box.style.left = clamp(cx - w / 2, 0, W - w) + "px";
+    box.style.top = clamp(cy - w * aspect / 2, 0, H - w * aspect) + "px";
+    sheet.appendChild(box);
+    boxes.push(box);
+    fitCaption(box);
+    refresh();
+
+    box.querySelector(".sig-x").addEventListener("click", (e) => {
+      e.stopPropagation();
+      box.remove(); boxes.splice(boxes.indexOf(box), 1); refresh();
+    });
+    let mode = null, sx, sy, ox, oy, ow;
+    box.addEventListener("pointerdown", (e) => {
+      if (e.target.classList.contains("sig-x")) return;
+      e.preventDefault(); e.stopPropagation();
+      mode = e.target.classList.contains("sig-resize") ? "size" : "move";
+      sx = e.clientX; sy = e.clientY;
+      ox = box.offsetLeft; oy = box.offsetTop; ow = box.offsetWidth;
+      box.setPointerCapture(e.pointerId);
+      box.classList.add("active");
+    });
+    box.addEventListener("pointermove", (e) => {
+      if (!mode) return;
+      const W = sheet.clientWidth, H = sheet.clientHeight;
+      if (mode === "move") {
+        box.style.left = clamp(ox + e.clientX - sx, 0, W - box.offsetWidth) + "px";
+        box.style.top = clamp(oy + e.clientY - sy, 0, H - box.offsetWidth * aspect) + "px";
+      } else {
+        box.style.width = clamp(ow + e.clientX - sx, W * 0.05, W - box.offsetLeft) + "px";
+      }
+    });
+    const stop = () => { mode = null; box.classList.remove("active"); };
+    box.addEventListener("pointerup", stop);
+    box.addEventListener("pointercancel", stop);
+    box.addEventListener("click", (e) => e.stopPropagation());
+  }
+
+  document.querySelectorAll(".sheet").forEach(sheet => {
+    sheet.addEventListener("click", (e) => {
+      const r = sheet.getBoundingClientRect();
+      add(sheet, e.clientX - r.left, e.clientY - r.top);
+    });
+  });
+  addEventListener("resize", () => boxes.forEach(fitCaption));
+
+  document.getElementById("sign-form").addEventListener("submit", (e) => {
+    if (!boxes.length) { e.preventDefault(); return; }
+    document.getElementById("placements").value = JSON.stringify(boxes.map(b => {
+      const s = b.parentElement;
+      return {page: +s.dataset.page, x: b.offsetLeft / s.clientWidth,
+              y: b.offsetTop / s.clientHeight, w: b.offsetWidth / s.clientWidth};
+    }));
+    btn.disabled = true; btn.textContent = "Signing...";
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

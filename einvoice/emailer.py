@@ -172,6 +172,8 @@ def build_message(inv: Invoice, cfg: Config, settings: EmailSettings, pdf: bytes
         "",
         *([f"  Amount:          JPY {fmt(inv.total_jpy)} + 12% VAT JPY {fmt(inv.vat_jpy)}"]
           if inv.is_vatable else []),
+        *([f"  Less withholding tax: PHP {fmt(inv.withholding_php)} "
+           f"(JPY {fmt(inv.withholding_jpy)})"] if inv.withholding_php else []),
         f"  Total due:       JPY {fmt(inv.total_due_jpy)}",
         f"  PHP equivalent:  PHP {fmt(inv.total_due_php)}",
         f"  Sale type:       {inv.sale_type}",

@@ -11,7 +11,7 @@ from flask import (Blueprint, Response, abort, current_app, flash, redirect, ren
                    request, url_for)
 
 from .. import money
-from ..books import chart, ledger, postings, printing, reports, taxes
+from ..books import chart, ledger, postings, printing, reports, specs, taxes
 from ..books.ledger import BooksError, Line
 from ..books.postings import PURCHASE_CATEGORIES
 from ..models import parse_tin, today_ph
@@ -199,6 +199,15 @@ def _build(c, key, start, end, party, account):
                              entity_id=request.args.get("id") or None)
 
 
+@bp.get("/books/system-specifications.pdf")
+def system_specifications():
+    """System and Technical Specifications for the CAS application."""
+    pdf = specs.build(conn(), cfg())
+    ledger.audit(conn(), "print", specs.TITLE, entity="report", entity_id="system-specifications")
+    return _download(pdf, f"System-and-Technical-Specifications-{cfg().seller.tin}.pdf",
+                     "application/pdf", inline=True)
+
+
 @bp.get("/books/archive")
 def archive():
     year = request.args.get("year", type=int) or today_ph().year
@@ -363,6 +372,12 @@ def new_collection():
                             "atc", "cwt_base", "cwt_rate", "cash_account")}
     data["coll_date"] = today_ph().isoformat()
     data["invoice_id"] = request.args.get("invoice", "")
+    if data["invoice_id"].isdigit():
+        # Withholding tax shown on the invoice: the client's 2307 should match.
+        row = conn().execute("SELECT withholding_php, total_php FROM invoices WHERE id = ?",
+                             (int(data["invoice_id"]),)).fetchone()
+        if row and Decimal(row["withholding_php"]):
+            data["cwt"], data["cwt_base"] = row["withholding_php"], row["total_php"]
     return _collection_form(data)
 
 
