@@ -124,10 +124,11 @@ def create_app(config: Config | None = None, transport: TransportSettings | None
             data[k + "[]"] = request.form.getlist(k + "[]")
         return data
 
-    def render_form(data: dict, errors: dict | None = None, status=200, draft_id: str = ""):
+    def render_form(data: dict, errors: dict | None = None, status=200, draft_id: str = "",
+                    from_last: bool = False):
         rows = list(zip_longest(*(data[k + "[]"] for k in LINE_FIELDS), fillvalue=""))
         return render_template("form.html", data=data, rows=rows, errors=errors or {},
-                               next_no=repo().next_control_no(),
+                               next_no=repo().next_control_no(), from_last=from_last,
                                draft_id=draft_id or secrets.token_hex(16)), status
 
     def keep_draft(data: dict) -> str:
@@ -172,7 +173,7 @@ def create_app(config: Config | None = None, transport: TransportSettings | None
         blank = [DEFAULT_ITEM_NAME, "", "1", DEFAULT_UNIT, "", ""]
         for i, k in enumerate(LINE_FIELDS):
             data[k + "[]"] = [blank[i]] * DEFAULT_LINES
-        return render_form(data)
+        return render_form(data, from_last=bool(last))
 
     @app.post("/invoices/review")
     def review_invoice():

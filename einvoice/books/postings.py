@@ -221,7 +221,7 @@ def bill_balance(conn, bill_id: int) -> Decimal:
 def open_invoices(conn) -> list[dict]:
     rows = conn.execute(
         """SELECT i.id, i.control_no, i.issue_date, i.customer_id, i.buyer_name, i.total_php,
-                  i.trans_class FROM invoices i
+                  i.trans_class, i.withholding_php FROM invoices i
            WHERE i.status = 'issued' ORDER BY i.control_no""").fetchall()
     out = []
     for r in rows:

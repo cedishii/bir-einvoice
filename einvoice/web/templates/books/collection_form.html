@@ -18,7 +18,7 @@
           <option value="">No invoice (on account)</option>
           {% for i in invoices %}
           <option value="{{ i.id }}" data-balance="{{ i.balance }}" data-net="{{ i.net_php }}"
-                  {{ 'selected' if data.invoice_id == i.id | string }}>{{ i.control_no }} · {{ i.buyer_name }} · balance {{ fmt(i.balance) }}</option>
+                  data-wht="{{ i.withholding_php }}" {{ 'selected' if data.invoice_id == i.id | string }}>{{ i.control_no }} · {{ i.buyer_name }} · balance {{ fmt(i.balance) }}</option>
           {% endfor %}
         </select>
         <small>Only invoices with a balance are listed.</small>
@@ -85,6 +85,14 @@
     if (o && o.dataset.balance) {
       if (!f.applied.value) f.applied.value = o.dataset.balance;
       if (!f.cwt_base.value) f.cwt_base.value = o.dataset.net;
+      // The withholding tax shown on the invoice: the client's 2307 should match.
+      // Its rate is filled in for the 2307 report; the amount stays as invoiced.
+      if (num(o.dataset.wht)) {
+        if (!f.cwt.value) f.cwt.value = o.dataset.wht;
+        if (!f.cwt_rate.value && num(o.dataset.net))
+          f.cwt_rate.value = (Math.round(num(o.dataset.wht) / num(o.dataset.net) * 10000) / 100).toFixed(2);
+        f.cwt.dataset.typed = "1";
+      }
     }
     update();
   }
@@ -97,7 +105,13 @@
                    : diff < 0 ? "Foreign exchange gain: " + two(-diff) : "No exchange difference";
   }
   f.cwt.addEventListener("input", () => f.cwt.dataset.typed = "1");
-  f.invoice_id.addEventListener("change", () => { f.applied.value = ""; f.cwt_base.value = ""; pickInvoice(); });
+  // A rate or base typed by hand works the tax out again.
+  [f.cwt_rate, f.cwt_base].forEach(i => i.addEventListener("input", () => delete f.cwt.dataset.typed));
+  f.invoice_id.addEventListener("change", () => {
+    f.applied.value = ""; f.cwt_base.value = ""; f.cwt.value = ""; f.cwt_rate.value = "";
+    delete f.cwt.dataset.typed;
+    pickInvoice();
+  });
   f.addEventListener("input", update);
   pickInvoice();
 </script>

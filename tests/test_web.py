@@ -60,6 +60,14 @@ def test_new_form_copies_last_client_but_not_the_rate(client):
     page = client.get("/invoices/new").get_data(as_text=True)
     assert 'value="MICRONET CO. LTD."' in page
     assert 'name="rate" value=""' in page
+    # Typing another client's name clears the copied TIN, address and e-mail.
+    assert "client-cleared" in page
+
+
+def test_form_reopened_with_errors_keeps_what_was_typed(client):
+    client.post("/invoices/issue", data=form() | {"token": "t4"})
+    page = client.post("/invoices/review", data=form(rate="")).get_data(as_text=True)
+    assert "client-cleared" not in page
 
 
 def test_unknown_invoice_404(client):

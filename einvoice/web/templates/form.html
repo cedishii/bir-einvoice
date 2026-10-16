@@ -126,6 +126,31 @@
     try { history.replaceState(null, "", "{{ url_for('new_invoice', draft=draft_id) }}"); } catch (e) {}
   });
 
+  // The form starts with the last invoice's client. When the client name is
+  // changed to another client, that client's TIN, address, business style
+  // and e-mail must not stay behind: clear the ones not edited here.
+  {% if from_last %}
+  (() => {
+    const name = document.querySelector('[name="buyer_name"]');
+    const start = name.value.trim().toUpperCase();
+    const others = ["buyer_tin", "buyer_address", "business_style", "buyer_email"]
+      .map(n => document.querySelector(`[name="${n}"]`)).filter(i => i.value);
+    if (!start || !others.length) return;
+    others.forEach(i => i.addEventListener("input", () => i.dataset.edited = "1"));
+    name.addEventListener("change", () => {
+      if (name.value.trim().toUpperCase() === start) return;
+      const cleared = others.filter(i => !i.dataset.edited && i.value);
+      cleared.forEach(i => { i.value = ""; });
+      if (cleared.length && !document.getElementById("client-cleared")) {
+        const note = document.createElement("small");
+        note.id = "client-cleared";
+        note.textContent = "New client: the previous client's TIN, address and e-mail were cleared.";
+        name.closest("label").appendChild(note);
+      }
+    });
+  })();
+  {% endif %}
+
   // Client TIN: keep only digits and add the dashes (123-456-789-00000).
   const tin = document.querySelector('[name="buyer_tin"]');
   tin.addEventListener("input", () => {

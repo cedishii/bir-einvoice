@@ -115,6 +115,9 @@ def test_review_page_and_collection_prefill(client):
     assert r.status_code == 302
     new = client.get("/collections/new?invoice=1").get_data(as_text=True)
     assert 'value="91200.00"' in new and 'value="4560000.00"' in new
+    # Choosing the invoice in the list (not through its link) fills it in too.
+    plain = client.get("/collections/new").get_data(as_text=True)
+    assert 'data-wht="91200.00"' in plain and 'data-net="4560000.00"' in plain
 
 
 def test_form_has_withholding_field(client):
